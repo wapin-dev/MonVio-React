@@ -1,0 +1,7 @@
+back-monviso/.gitignore
+back-monviso/.env
+back-monviso/.env.example
+back-monviso/venv
+back-monviso/staticfiles
+back-monviso/media
+

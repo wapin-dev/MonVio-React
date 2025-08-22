@@ -1,0 +1,72 @@
+version: '3.8'
+
+services:
+  # Service pour le backend Django
+  backend:
+    build: ./back-monviso
+    container_name: monviso-backend
+    restart: always
+    volumes:
+      - ./back-monviso:/app
+      - static_volume:/app/staticfiles
+      - media_volume:/app/media
+    env_file:
+      - ./back-monviso/.env
+    depends_on:
+      - db
+    networks:
+      - monviso-network
+
+  # Service pour le frontend React
+  frontend:
+    build: ./front-monviso
+    container_name: monviso-frontend
+    restart: always
+    ports:
+      - "8080:80"
+    depends_on:
+      - backend
+    networks:
+      - monviso-network
+
+  # Service pour la base de données PostgreSQL
+  db:
+    image: postgres:15-alpine
+    container_name: monviso-db
+    restart: always
+    volumes:
+      - postgres_data:/var/lib/postgresql/data/
+    env_file:
+      - ./back-monviso/.env
+    environment:
+      - POSTGRES_PASSWORD=${DB_PASSWORD}
+      - POSTGRES_USER=${DB_USER}
+      - POSTGRES_DB=${DB_NAME}
+    networks:
+      - monviso-network
+
+  # Service pour pgAdmin (optionnel, pour gérer la base de données)
+  pgadmin:
+    image: dpage/pgadmin4
+    container_name: monviso-pgadmin
+    restart: always
+    ports:
+      - "5050:80"
+    env_file:
+      - ./back-monviso/.env
+    environment:
+      - PGADMIN_DEFAULT_EMAIL=${PGADMIN_EMAIL}
+      - PGADMIN_DEFAULT_PASSWORD=${PGADMIN_PASSWORD}
+    depends_on:
+      - db
+    networks:
+      - monviso-network
+
+networks:
+  monviso-network:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  static_volume:
+  media_volume:
