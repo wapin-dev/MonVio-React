@@ -6,12 +6,14 @@ services:
     build: ./back-monviso
     container_name: monviso-backend
     restart: always
+    ports:
+      - "8000:8000"
     volumes:
       - ./back-monviso:/app
       - static_volume:/app/staticfiles
       - media_volume:/app/media
     env_file:
-      - ./back-monviso/.env
+      - ./.env
     depends_on:
       - db
     networks:
@@ -37,7 +39,7 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data/
     env_file:
-      - ./back-monviso/.env
+      - ./.env
     environment:
       - POSTGRES_PASSWORD=${DB_PASSWORD}
       - POSTGRES_USER=${DB_USER}
@@ -53,7 +55,7 @@ services:
     ports:
       - "5050:80"
     env_file:
-      - ./back-monviso/.env
+      - ./.env
     environment:
       - PGADMIN_DEFAULT_EMAIL=${PGADMIN_EMAIL}
       - PGADMIN_DEFAULT_PASSWORD=${PGADMIN_PASSWORD}
