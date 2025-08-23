@@ -1,128 +1,188 @@
-# Mon Viso Budget - Application de Gestion de Budget
+# MonViso Budget - Application de Gestion Budgétaire
 
-Application de gestion de budget avec frontend React et backend Django, conteneurisée avec Docker.
+## 📋 Description
 
-## Architecture du Projet
+MonViso Budget est une application web moderne de gestion budgétaire personnelle qui aide les utilisateurs à suivre leurs finances selon la règle budgétaire 50/30/20. L'application offre une interface intuitive pour gérer les revenus, dépenses et objectifs d'épargne.
 
-- **Frontend**: React/TypeScript avec Vite
-- **Backend**: Django REST Framework
-- **Base de données**: PostgreSQL
-- **Outils supplémentaires**: pgAdmin pour la gestion de la base de données
+## 🎯 Fonctionnalités Principales
 
-## Prérequis
+### ✅ Authentification & Onboarding
+- **Inscription/Connexion** sécurisée avec JWT
+- **Processus d'onboarding** en 4 étapes :
+  1. Informations personnelles (prénom, nom)
+  2. Configuration des revenus (salaire principal, revenus complémentaires)
+  3. Gestion des dépenses (fixes et variables)
+  4. Définition des objectifs d'épargne
 
-- Docker
-- Docker Compose
+### 📊 Dashboard Financier
+- **Vue d'ensemble** des finances personnelles
+- **Cartes de résumé** : Solde actuel, Dépenses totales, Revenus mensuels, Économies recommandées
+- **Graphiques interactifs** : 
+  - Répartition des dépenses (camembert)
+  - Évolution budgétaire (barres)
+- **Règle 50/30/20** intégrée :
+  - 50% pour les besoins essentiels (dépenses fixes)
+  - 30% pour les envies (dépenses variables)
+  - 20% pour l'épargne
 
-## Configuration
+### 👤 Gestion de Profil
+- **Profil utilisateur** complet avec informations personnelles
+- **Modification des revenus** mensuels
+- **Historique** des données financières
 
-1. **Cloner le projet**:
-   ```bash
-   git clone <votre-repo>
-   cd mon-viso-budget
-   ```
+### 🎨 Interface Utilisateur
+- **Design moderne** avec Tailwind CSS
+- **Interface responsive** adaptée mobile/desktop
+- **Thème sombre** avec effets glassmorphism
+- **Navigation intuitive** avec sidebar animée
+- **Indicateurs visuels** de progression budgétaire
 
-2. **Configurer les variables d'environnement**:
-   ```bash
-   cp back-monviso/.env.example back-monviso/.env
-   ```
-   Modifiez les valeurs dans le fichier `.env` selon vos besoins.
+## 🏗️ Architecture Technique
 
-3. **Configurer l'URL de l'API dans le frontend**:
-   Si nécessaire, modifiez l'URL de l'API dans `front-monviso/src/services/api.ts` pour qu'elle pointe vers le backend:
-   ```typescript
-   const API_URL = '/api/';  // Sera redirigé via Nginx
-   ```
-
-## Démarrage
-
-1. **Construire et démarrer les conteneurs**:
-   ```bash
-   docker-compose up -d --build
-   ```
-
-2. **Initialiser la base de données**:
-   ```bash
-   docker-compose exec backend python manage.py migrate
-   docker-compose exec backend python manage.py createsuperuser
-   ```
-
-3. **Accéder à l'application**:
-   - Frontend: http://localhost
-   - Backend API: http://localhost/api/
-   - Admin Django: http://localhost/api/admin/
-   - pgAdmin: http://localhost:5050
-
-## Structure des Conteneurs
-
-- **frontend**: Serveur Nginx servant l'application React compilée
-- **backend**: Serveur Django avec Gunicorn
-- **db**: Base de données PostgreSQL
-- **pgadmin**: Interface d'administration pour PostgreSQL
-
-## Développement
-
-### Mode développement
-
-Pour travailler en mode développement avec rechargement à chaud:
-
-1. **Frontend**:
-   ```bash
-   cd front-monviso
-   npm install
-   npm run dev
-   ```
-
-2. **Backend**:
-   ```bash
-   cd back-monviso
-   python -m venv venv
-   source venv/bin/activate  # Sur Windows: venv\Scripts\activate
-   pip install -r requirements.txt
-   python manage.py runserver
-   ```
-
-### Commandes utiles
-
-- **Voir les logs**:
-  ```bash
-  docker-compose logs -f [service]
-  ```
-
-- **Exécuter des commandes dans un conteneur**:
-  ```bash
-  docker-compose exec [service] [commande]
-  ```
-
-- **Arrêter les conteneurs**:
-  ```bash
-  docker-compose down
-  ```
-
-## Déploiement en Production
-
-Pour un déploiement en production:
-
-1. Modifiez les variables d'environnement dans `back-monviso/.env`:
-   - Définissez `DEBUG=False`
-   - Utilisez un `SECRET_KEY` fort et unique
-   - Configurez correctement `ALLOWED_HOSTS` et `CORS_ALLOWED_ORIGINS`
-
-2. Construisez et démarrez les conteneurs:
-   ```bash
-   docker-compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
-   ```
-
-## Sauvegarde et Restauration
-
-### Sauvegarde de la base de données
-
-```bash
-docker-compose exec db pg_dump -U monviso_user -d monviso > backup.sql
+### Backend (Django REST Framework)
+```
+back-monviso/
+├── api/                    # API REST endpoints
+│   ├── views.py           # Vues API (Auth, Onboarding, Dashboard)
+│   ├── serializers.py     # Sérialiseurs DRF
+│   └── urls.py           # Routes API
+├── budget/                # Modèles de données
+│   ├── models.py         # UserProfile, Income, Expense, SavingsGoal
+│   └── admin.py          # Interface d'administration
+└── monviso/              # Configuration Django
+    ├── settings.py       # Paramètres (JWT, CORS, DB)
+    └── urls.py          # URLs principales
 ```
 
-### Restauration de la base de données
+**Modèles de données :**
+- `UserProfile` : Profil utilisateur avec revenu mensuel
+- `Income` : Sources de revenus (salaire, freelance, investissements)
+- `Expense` : Dépenses fixes et variables
+- `SavingsGoal` : Objectifs d'épargne avec progression
 
-```bash
-cat backup.sql | docker-compose exec -T db psql -U monviso_user -d monviso
+### Frontend (React + TypeScript)
 ```
+front-monviso/
+├── src/
+│   ├── components/        # Composants React
+│   │   ├── Dashboard.tsx     # Tableau de bord principal
+│   │   ├── OnboardingModal.tsx # Processus d'onboarding
+│   │   ├── UserProfile.tsx   # Gestion du profil
+│   │   └── Layout.tsx       # Layout principal avec sidebar
+│   ├── contexts/         # Contextes React
+│   │   └── AuthContext.tsx  # Gestion auth + données financières
+│   ├── services/         # Services API
+│   │   └── api.ts          # Appels API (auth, onboarding, dashboard)
+│   └── pages/           # Pages de l'application
+└── public/              # Assets statiques
+```
+
+## 🚀 Installation & Démarrage
+
+### Prérequis
+- Docker & Docker Compose
+- Node.js 18+ (pour développement local)
+- Python 3.9+ (pour développement local)
+
+### Démarrage avec Docker
+```bash
+# Cloner le repository
+git clone <repository-url>
+cd mon-viso-budget
+
+# Lancer l'application complète
+docker-compose up -d
+
+# L'application sera accessible sur :
+# - Frontend: http://localhost:8080
+# - Backend API: http://localhost:8000
+```
+
+### Variables d'environnement
+Créer un fichier `.env` à la racine :
+```env
+# Base de données
+DATABASE_URL=postgresql://user:password@db:5432/monviso_budget
+
+# JWT
+SECRET_KEY=your-secret-key-here
+JWT_SECRET_KEY=your-jwt-secret-here
+
+# CORS
+CORS_ALLOWED_ORIGINS=http://localhost:8080
+```
+
+## 📱 Utilisation
+
+### 1. Première connexion
+1. Créer un compte sur `/register`
+2. Se connecter sur `/login`
+3. Compléter l'onboarding (4 étapes)
+
+### 2. Navigation principale
+- **Dashboard** (`/`) : Vue d'ensemble financière
+- **Profil** (`/profile`) : Gestion des informations personnelles
+- **Sidebar** : Navigation rapide avec aperçu budgétaire
+
+### 3. Gestion budgétaire
+- Les données sont automatiquement calculées selon la règle 50/30/20
+- Les graphiques se mettent à jour en temps réel
+- La barre de progression indique le budget restant
+
+## 🔧 API Endpoints
+
+### Authentification
+- `POST /api/auth/login/` - Connexion
+- `POST /api/auth/register/` - Inscription
+- `GET /api/profile/` - Profil utilisateur
+
+### Onboarding
+- `POST /api/onboarding/` - Soumission des données d'onboarding
+- `GET /api/onboarding/status/` - Statut de l'onboarding
+
+### Dashboard
+- `GET /api/dashboard/` - Données financières complètes
+
+## 🎨 Technologies Utilisées
+
+### Backend
+- **Django 4.2** - Framework web Python
+- **Django REST Framework** - API REST
+- **JWT Authentication** - Authentification sécurisée
+- **PostgreSQL** - Base de données
+- **Docker** - Containerisation
+
+### Frontend
+- **React 18** - Bibliothèque UI
+- **TypeScript** - Typage statique
+- **Tailwind CSS** - Framework CSS
+- **Recharts** - Graphiques interactifs
+- **Lucide React** - Icônes modernes
+- **React Router** - Navigation
+
+## 🔮 Fonctionnalités à Venir
+
+- [ ] Gestion des transactions détaillées
+- [ ] Catégories personnalisées
+- [ ] Notifications et alertes budgétaires
+- [ ] Export des données (PDF, Excel) (peut-être une partie entreprise)
+- [ ] Objectifs d'épargne avancés sur la loi des 50/30/20 adapter a l'utilisateur
+- [ ] Analyse prédictive des dépenses (peut-être une partie entreprise)
+- [ ] Mode multi-comptes (coloc, couple, etc etc..)
+- [ ] Application mobile
+
+## 🤝 Contribution
+
+1. Fork le projet
+2. Créer une branche feature (`git checkout -b feature/nouvelle-fonctionnalite`)
+3. Commit les changements (`git commit -am 'Ajout nouvelle fonctionnalité'`)
+4. Push vers la branche (`git push origin feature/nouvelle-fonctionnalite`)
+5. Créer une Pull Request
+
+## 📄 Licence
+
+Ce projet est sous licence MIT. Voir le fichier `LICENSE` pour plus de détails.
+
+## 👥 Équipe
+
+Développé avec ❤️ pour une gestion budgétaire moderne et intuitive.

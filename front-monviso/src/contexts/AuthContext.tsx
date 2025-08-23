@@ -1,24 +1,36 @@
 import React, { useEffect, useState, createContext, useContext } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { authService, budgetService } from '../services/api';
+import { authService, budgetService, onboardingService, dashboardService } from '../services/api';
 
 interface User {
   id: number;
   username: string;
   email: string;
-  first_name?: string;
-  last_name?: string;
+  first_name: string;
+  last_name: string;
   monthly_income?: number;
-  setup_completed?: boolean;
+}
+
+interface FinancialData {
+  monthly_income: number;
+  total_income: number;
+  total_expenses: number;
+  total_fixed_expenses: number;
+  total_variable_expenses: number;
+  remaining_budget: number;
 }
 
 interface AuthContextType {
   user: User | null;
+  financialData: FinancialData | null;
   isAuthenticated: boolean;
   isLoading: boolean;
+  needsOnboarding: boolean;
   login: (email: string, password: string) => Promise<void>;
-  signup: (username: string, email: string, password: string) => Promise<void>;
+  signup: (email: string, password: string, firstName: string, lastName: string) => Promise<void>;
   logout: () => void;
+  completeOnboarding: () => void;
+  refreshFinancialData: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
@@ -37,40 +49,40 @@ export const AuthProvider: React.FC<{
   children
 }) => {
   const [user, setUser] = useState<User | null>(null);
+  const [financialData, setFinancialData] = useState<FinancialData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [needsOnboarding, setNeedsOnboarding] = useState(false);
   const navigate = useNavigate();
 
-  // Vérifier si l'utilisateur est déjà connecté au chargement
-  useEffect(() => {
-    const checkAuth = async () => {
-      const token = localStorage.getItem('access_token');
-      if (token) {
-        try {
-          // Récupérer les informations de l'utilisateur
-          const response = await budgetService.getUserProfile();
-          setUser(response.data);
-        } catch (error) {
-          console.error('Erreur lors de la récupération du profil:', error);
-          // Si le token est invalide, déconnecter l'utilisateur
-          localStorage.removeItem('access_token');
-          localStorage.removeItem('refresh_token');
-        }
-      }
-      setIsLoading(false);
-    };
-    
-    checkAuth();
-  }, []);
+  const checkOnboardingStatus = async () => {
+    try {
+      const response = await onboardingService.checkOnboardingStatus();
+      setNeedsOnboarding(!response.data.onboarding_completed);
+    } catch (error) {
+      console.error('Error checking onboarding status:', error);
+      setNeedsOnboarding(true); // Default to showing onboarding if check fails
+    }
+  };
+
+  const completeOnboarding = () => {
+    setNeedsOnboarding(false);
+  };
 
   const login = async (email: string, password: string) => {
     setIsLoading(true);
     try {
-      // Appeler l'API pour se connecter
+      console.log('[AUTH] Attempting login with email:', email);
       const authResponse = await authService.login(email, password);
+      console.log('[AUTH] Login successful, fetching profile...');
       
-      // Récupérer les informations de l'utilisateur
       const userResponse = await budgetService.getUserProfile();
+      console.log('[AUTH] Profile fetched:', userResponse.data);
       setUser(userResponse.data);
+      
+      // Check onboarding status after successful login
+      await checkOnboardingStatus();
+      
+      await refreshFinancialData();
       
       navigate('/');
     } catch (error) {
@@ -81,13 +93,14 @@ export const AuthProvider: React.FC<{
     }
   };
 
-  const signup = async (username: string, email: string, password: string) => {
+  const signup = async (email: string, password: string, firstName: string, lastName: string) => {
     setIsLoading(true);
     try {
-      // Appeler l'API pour créer un compte
-      await authService.register(username, email, password);
+      console.log('[AUTH] Attempting signup...');
+      await authService.register(email, password, firstName, lastName);
+      console.log('[AUTH] Signup successful, logging in...');
       
-      // Se connecter automatiquement après l'inscription
+      // Auto-login after successful signup
       await login(email, password);
     } catch (error) {
       console.error('Erreur d\'inscription:', error);
@@ -101,19 +114,52 @@ export const AuthProvider: React.FC<{
     // Appeler le service d'authentification pour se déconnecter
     authService.logout();
     setUser(null);
+    setFinancialData(null);
     navigate('/get-started');
   };
 
-  return (
-    <AuthContext.Provider value={{
-      user,
-      isAuthenticated: !!user,
-      isLoading,
-      login,
-      signup,
-      logout
-    }}>
-      {children}
-    </AuthContext.Provider>
-  );
+  const refreshFinancialData = async () => {
+    try {
+      const response = await dashboardService.getFinancialData();
+      setFinancialData(response.data);
+    } catch (error) {
+      console.error('Error refreshing financial data:', error);
+    }
+  };
+
+  useEffect(() => {
+    const initAuth = async () => {
+      const token = localStorage.getItem('access_token');
+      if (token) {
+        try {
+          const userResponse = await budgetService.getUserProfile();
+          setUser(userResponse.data);
+          await checkOnboardingStatus();
+          await refreshFinancialData();
+        } catch (error) {
+          console.error('Erreur lors de la vérification du token:', error);
+          localStorage.removeItem('access_token');
+          localStorage.removeItem('refresh_token');
+        }
+      }
+      setIsLoading(false);
+    };
+
+    initAuth();
+  }, []);
+
+  const value: AuthContextType = {
+    user,
+    financialData,
+    isAuthenticated: !!user,
+    isLoading,
+    needsOnboarding,
+    login,
+    signup,
+    logout,
+    completeOnboarding,
+    refreshFinancialData
+  };
+
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };

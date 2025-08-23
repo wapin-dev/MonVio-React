@@ -39,7 +39,13 @@ const Signup = () => {
       setError('');
       setSuccess('');
       setIsSubmitting(true);
-      await signup(name, email, password);
+      
+      // Split name into first and last name
+      const nameParts = name.trim().split(' ');
+      const firstName = nameParts[0] || '';
+      const lastName = nameParts.slice(1).join(' ') || '';
+      
+      await signup(email, password, firstName, lastName);
       setSuccess('Inscription réussie ! Redirection en cours...');
     } catch (err: any) {
       console.error('Erreur d\'inscription:', err);

@@ -38,11 +38,13 @@ export const authService = {
     return response.data;
   },
   
-  register: async (username: string, email: string, password: string) => {
-    return await api.post('auth/register/', { 
-      username, 
-      email, 
-      password 
+  register: async (email: string, password: string, firstName: string, lastName: string) => {
+    const fullName = `${firstName} ${lastName}`.trim();
+    return await api.post('auth/register/', {
+      username: email, // Use email as username
+      email,
+      password,
+      full_name: fullName
     });
   },
   
@@ -107,6 +109,16 @@ export const transactionService = {
   }
 };
 
+// Fonctions pour récupérer les données financières du dashboard
+export const dashboardService = {
+  getFinancialData: async () => {
+    return await api.get('dashboard/');
+  },
+  getRealFinancialData: async () => {
+    return await api.get('financial-data/');
+  }
+};
+
 // Fonction pour obtenir le résumé du budget
 export const budgetService = {
   getSummary: async () => {
@@ -119,6 +131,29 @@ export const budgetService = {
   
   updateUserProfile: async (profileData: any) => {
     return await api.patch('profile/', profileData);
+  }
+};
+
+// Onboarding API
+export const onboardingService = {
+  // Submit complete onboarding data
+  submitOnboarding: async (onboardingData: any) => {
+    console.log('[API] Submitting onboarding data:', onboardingData);
+    const response = await api.post('/onboarding/', onboardingData);
+    console.log('[API] Onboarding submission response:', response.data);
+    return response;
+  },
+
+  // Check onboarding status
+  checkOnboardingStatus: async () => {
+    const response = await api.get('/onboarding/status/');
+    return response;
+  },
+
+  // Get user's financial data
+  getFinancialData: async () => {
+    const response = await api.get('/financial-data/');
+    return response;
   }
 };
 

@@ -99,7 +99,7 @@ const UserProfile = () => {
                       Revenu mensuel net
                     </label>
                     <div className="mt-1 relative rounded-md shadow-sm">
-                      <input type="text" name="monthly-income" id="monthly-income" defaultValue={user?.monthly_income?.toString() || '2400'} className="mt-1 block w-full rounded-md border-gray-300 focus:border-blue-500 focus:ring-blue-500 pl-3 pr-12" />
+                      <input type="text" name="monthly-income" id="monthly-income" defaultValue={user?.monthly_income?.toString() || '0'} className="mt-1 block w-full rounded-md border-gray-300 focus:border-blue-500 focus:ring-blue-500 pl-3 pr-12" />
                       <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
                         <span className="text-gray-500 sm:text-sm">€</span>
                       </div>

@@ -17,7 +17,8 @@ const Layout: React.FC<LayoutProps> = ({
   const location = useLocation();
   const {
     user,
-    logout
+    logout,
+    financialData
   } = useAuth();
   const navigate = useNavigate();
   // Update active tab based on location
@@ -145,16 +146,16 @@ const Layout: React.FC<LayoutProps> = ({
               <div className="flex justify-between items-center">
                 <div>
                   <p className="text-xs text-gray-400">Dépenses</p>
-                  <p className="text-sm font-medium text-white">2 145,30 €</p>
+                  <p className="text-sm font-medium text-white">{financialData?.total_expenses?.toFixed(2) || '0.00'} €</p>
                 </div>
                 <div>
                   <p className="text-xs text-gray-400">Reste</p>
-                  <p className="text-sm font-medium text-green-400">254,70 €</p>
+                  <p className="text-sm font-medium text-green-400">{financialData?.remaining_budget?.toFixed(2) || '0.00'} €</p>
                 </div>
               </div>
               <div className="mt-3 h-1.5 w-full rounded-full bg-gray-700/50 overflow-hidden">
                 <div className="h-full bg-gradient-to-r from-blue-500 to-blue-600 rounded-full" style={{
-                width: '80%'
+                width: `${financialData ? Math.max(0, Math.min(100, (financialData.remaining_budget / financialData.monthly_income) * 100)) : 0}%`
               }}></div>
               </div>
             </div>

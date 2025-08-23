@@ -2,40 +2,47 @@ import React, { useEffect, useState } from 'react';
 import { TrendingUpIcon, TrendingDownIcon, DollarSignIcon, PiggyBankIcon, AlertCircleIcon, ArrowRightIcon } from 'lucide-react';
 import { PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid, Area, AreaChart } from 'recharts';
 import { Link } from 'react-router-dom';
-import { budgetService, categoryService, transactionService } from '../services/api';
+import { dashboardService } from '../services/api';
+import { useAuth } from '../contexts/AuthContext';
 
-interface BudgetSummary {
+interface FinancialData {
   monthly_income: number;
+  total_income: number;
   total_expenses: number;
+  total_fixed_expenses: number;
+  total_variable_expenses: number;
   remaining_budget: number;
-  categories: CategorySummary[];
+  incomes: Income[];
+  fixed_expenses: Expense[];
+  variable_expenses: Expense[];
+  savings_goals: SavingsGoal[];
 }
 
-interface CategorySummary {
-  id: number;
-  name: string;
-  icon: string;
-  budget: number;
-  spent: number;
-  remaining: number;
-}
-
-interface Category {
-  id: number;
-  name: string;
-  icon: string;
-  budget: number;
-  spent: number;
-  user?: number;
-}
-
-interface Transaction {
+interface Income {
   id: number;
   name: string;
   amount: number;
-  date: string;
-  category: number;
-  description?: string;
+  type: string;
+  frequency: string;
+  is_primary: boolean;
+}
+
+interface Expense {
+  id: number;
+  name: string;
+  amount: number;
+  frequency: string;
+  type: string;
+}
+
+interface SavingsGoal {
+  id: number;
+  name: string;
+  target_amount: number;
+  current_amount: number;
+  target_date: string;
+  type: string;
+  priority: string;
 }
 
 interface PieDataItem {
@@ -44,44 +51,51 @@ interface PieDataItem {
   color: string;
 }
 
+interface BarDataItem {
+  name: string;
+  amount: number;
+  color: string;
+}
+
 const Dashboard = () => {
+  const { user } = useAuth();
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
-  const [budgetSummary, setBudgetSummary] = useState<BudgetSummary | null>(null);
-  const [recentTransactions, setRecentTransactions] = useState<Transaction[]>([]);
+  const [financialData, setFinancialData] = useState<FinancialData | null>(null);
   const [pieData, setPieData] = useState<PieDataItem[]>([]);
-  const [barData, setBarData] = useState([]);
+  const [barData, setBarData] = useState<BarDataItem[]>([]);
 
   const loadDashboardData = async () => {
     setIsLoading(true);
     setError(null);
 
     try {
-      const summaryResponse = await budgetService.getSummary();
-      setBudgetSummary(summaryResponse.data);
+      const response = await dashboardService.getFinancialData();
+      setFinancialData(response.data);
 
-      const transactionsResponse = await transactionService.getAll();
-      const sortedTransactions = transactionsResponse.data
-        .sort((a: Transaction, b: Transaction) => 
-          new Date(b.date).getTime() - new Date(a.date).getTime())
-        .slice(0, 5);
-      
-      setRecentTransactions(sortedTransactions);
-
-      const categoriesResponse = await categoryService.getAll();
-      const pieData = categoriesResponse.data.map((category: Category) => ({
-        name: category.name,
-        value: category.spent,
-        color: '#3b82f6'
-      }));
+      // Create pie chart data from expenses
+      const pieData = [
+        ...response.data.fixed_expenses.map((expense: Expense) => ({
+          name: expense.name,
+          value: expense.amount,
+          color: '#ef4444'
+        })),
+        ...response.data.variable_expenses.map((expense: Expense) => ({
+          name: expense.name,
+          value: expense.amount,
+          color: '#3b82f6'
+        }))
+      ];
       setPieData(pieData);
 
-      const barData = transactionsResponse.data.map((transaction: Transaction) => ({
-        name: new Date(transaction.date).toLocaleDateString(),
-        dépenses: transaction.amount,
-        budget: summaryResponse.data.monthly_income
-      }));
+      // Create bar chart data (simplified for now)
+      const barData = [
+        { name: 'Revenus', amount: response.data.total_income, color: '#10b981' },
+        { name: 'Dépenses fixes', amount: response.data.total_fixed_expenses, color: '#ef4444' },
+        { name: 'Dépenses variables', amount: response.data.total_variable_expenses, color: '#3b82f6' }
+      ];
       setBarData(barData);
+
     } catch (err) {
       console.error('Erreur lors du chargement des données:', err);
       setError('Impossible de charger les données. Veuillez réessayer plus tard.');
@@ -136,8 +150,9 @@ const Dashboard = () => {
                     Solde actuel
                   </dt>
                   <dd className="text-lg font-semibold text-white">
-                    {budgetSummary ? budgetSummary.monthly_income.toFixed(2) : 0} €
+                    {financialData?.remaining_budget?.toFixed(2) || '0.00'} €
                   </dd>
+
                 </dl>
               </div>
             </div>
@@ -156,7 +171,7 @@ const Dashboard = () => {
                     Dépenses du mois
                   </dt>
                   <dd className="text-lg font-semibold text-white">
-                    {budgetSummary ? budgetSummary.total_expenses.toFixed(2) : 0} €
+                    {financialData ? financialData.total_expenses.toFixed(2) : 0} €
                   </dd>
                 </dl>
               </div>
@@ -176,7 +191,7 @@ const Dashboard = () => {
                     Revenus du mois
                   </dt>
                   <dd className="text-lg font-semibold text-white">
-                    {budgetSummary ? budgetSummary.monthly_income.toFixed(2) : 0} €
+                    {financialData?.monthly_income ? financialData.monthly_income.toFixed(2) : '0.00'} €
                   </dd>
                 </dl>
               </div>
@@ -196,7 +211,7 @@ const Dashboard = () => {
                     Économies
                   </dt>
                   <dd className="text-lg font-semibold text-white">
-                    {budgetSummary ? budgetSummary.remaining_budget.toFixed(2) : 0} €
+                  {financialData ? (financialData.remaining_budget * 0.20).toFixed(2) : '0.00'} €
                   </dd>
                 </dl>
               </div>
@@ -261,17 +276,7 @@ const Dashboard = () => {
             <div className="mt-4 relative z-10">
               <div className="h-64 w-full">
                 <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart data={barData}>
-                    <defs>
-                      <linearGradient id="colorBudget" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#60a5fa" stopOpacity={0.8} />
-                        <stop offset="95%" stopColor="#60a5fa" stopOpacity={0.1} />
-                      </linearGradient>
-                      <linearGradient id="colorExpenses" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#f87171" stopOpacity={0.8} />
-                        <stop offset="95%" stopColor="#f87171" stopOpacity={0.1} />
-                      </linearGradient>
-                    </defs>
+                  <BarChart data={barData}>
                     <CartesianGrid strokeDasharray="3 3" stroke={chartColors.gridLines} />
                     <XAxis dataKey="name" stroke={chartColors.text} />
                     <YAxis stroke={chartColors.text} />
@@ -283,9 +288,8 @@ const Dashboard = () => {
                     backdropFilter: 'blur(8px)',
                     color: '#e2e8f0'
                   }} formatter={value => [`${value} €`, null]} />
-                    <Area type="monotone" dataKey="budget" stroke={chartColors.budget} fillOpacity={1} fill="url(#colorBudget)" name="Budget" />
-                    <Area type="monotone" dataKey="dépenses" stroke={chartColors.expenses} fillOpacity={1} fill="url(#colorExpenses)" name="Dépenses" />
-                  </AreaChart>
+                    {barData.map((item, index) => <Bar key={item.name} dataKey="amount" fill={item.color} name={item.name} />)}
+                  </BarChart>
                 </ResponsiveContainer>
               </div>
             </div>
@@ -328,18 +332,18 @@ const Dashboard = () => {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-700/30 bg-transparent">
-                      {recentTransactions.map(transaction => <tr key={transaction.id} className="hover:bg-white/5 transition-colors">
+                      {financialData?.incomes.map((income: Income) => <tr key={income.id} className="hover:bg-white/5 transition-colors">
                           <td className="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-100 sm:pl-0">
-                            {transaction.name}
+                            {income.name}
                           </td>
                           <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-300">
-                            {transaction.category}
+                            {income.type}
                           </td>
                           <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-300">
-                            {transaction.date}
+                            {income.frequency}
                           </td>
-                          <td className={`whitespace-nowrap px-3 py-4 text-sm text-right ${transaction.amount >= 0 ? 'text-green-400 font-medium' : 'text-red-400 font-medium'}`}>
-                            {transaction.amount >= 0 ? `+${transaction.amount.toFixed(2)} €` : `${transaction.amount.toFixed(2)} €`}
+                          <td className={`whitespace-nowrap px-3 py-4 text-sm text-right ${income.amount >= 0 ? 'text-green-400 font-medium' : 'text-red-400 font-medium'}`}>
+                            {income.amount >= 0 ? `+${income.amount.toFixed(2)} €` : `${income.amount.toFixed(2)} €`}
                           </td>
                         </tr>)}
                     </tbody>
@@ -357,15 +361,15 @@ const Dashboard = () => {
               Alertes & Conseils
             </h3>
             <div className="mt-4 space-y-4 relative z-10">
-              {budgetSummary && budgetSummary.categories.map(category => (
-                <div key={category.id} className="rounded-xl bg-yellow-500/10 backdrop-blur-md border border-yellow-500/20 p-4 shadow-lg shadow-yellow-500/5">
+              {financialData && financialData.fixed_expenses.map((expense: Expense) => (
+                <div key={expense.id} className="rounded-xl bg-yellow-500/10 backdrop-blur-md border border-yellow-500/20 p-4 shadow-lg shadow-yellow-500/5">
                   <div className="flex">
                     <div className="flex-shrink-0">
                       <AlertCircleIcon size={20} className="text-yellow-400" />
                     </div>
                     <div className="ml-3">
                       <p className="text-sm text-yellow-200">
-                        Vous avez dépassé votre budget {category.name} de {category.spent - category.budget}€
+                        Vous avez dépassé votre budget {expense.name} de {expense.amount}€
                       </p>
                     </div>
                   </div>

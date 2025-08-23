@@ -4,6 +4,9 @@ from rest_framework import status, permissions
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework_simplejwt.tokens import RefreshToken
+from rest_framework.permissions import IsAuthenticated
+from .serializers import OnboardingDataSerializer, UserProfileSerializer, IncomeSerializer, ExpenseSerializer, SavingsGoalSerializer
+from budget.models import UserProfile, Income, Expense, SavingsGoal
 
 # Create your views here.
 
@@ -27,12 +30,19 @@ class ProfileView(APIView):
     
     def get(self, request):
         user = request.user
+        try:
+            profile = UserProfile.objects.get(user=user)
+            monthly_income = profile.monthly_income
+        except UserProfile.DoesNotExist:
+            monthly_income = None
+            
         return Response({
             'id': user.id,
             'username': user.username,
             'email': user.email,
             'first_name': user.first_name,
             'last_name': user.last_name,
+            'monthly_income': monthly_income,
         })
 
 class LoginView(APIView):
@@ -85,8 +95,12 @@ class RegisterView(APIView):
         username = request.data.get('username')
         email = request.data.get('email')
         password = request.data.get('password')
-        first_name = request.data.get('first_name', username)
-        last_name = request.data.get('last_name', '')
+        full_name = request.data.get('full_name', '')
+        
+        # Split full name into first and last name
+        name_parts = full_name.strip().split(' ', 1) if full_name else []
+        first_name = name_parts[0] if len(name_parts) > 0 else ''
+        last_name = name_parts[1] if len(name_parts) > 1 else ''
         
         if not username or not email or not password:
             return Response({'error': 'Tous les champs sont requis'}, status=status.HTTP_400_BAD_REQUEST)
@@ -125,3 +139,141 @@ class RegisterView(APIView):
                 'last_name': user.last_name,
             }
         }, status=status.HTTP_201_CREATED)
+
+class OnboardingView(APIView):
+    permission_classes = [IsAuthenticated]
+    
+    def post(self, request):
+        """Complete user onboarding with all financial data"""
+        print(f"[ONBOARDING] User {request.user.username} submitting onboarding data")
+        print(f"[ONBOARDING] Data received: {request.data}")
+        
+        serializer = OnboardingDataSerializer(data=request.data, context={'request': request})
+        if serializer.is_valid():
+            result = serializer.save()
+            print(f"[ONBOARDING] Onboarding completed successfully for user {request.user.username}")
+            return Response({
+                'message': result['message'],
+                'onboarding_completed': True,
+                'user': {
+                    'id': result['user'].id,
+                    'username': result['user'].username,
+                    'email': result['user'].email,
+                    'first_name': result['user'].first_name,
+                    'last_name': result['user'].last_name,
+                }
+            }, status=status.HTTP_201_CREATED)
+        else:
+            print(f"[ONBOARDING] Validation errors: {serializer.errors}")
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+class OnboardingStatusView(APIView):
+    permission_classes = [IsAuthenticated]
+    
+    def get(self, request):
+        """Check if user has completed onboarding"""
+        try:
+            profile = UserProfile.objects.get(user=request.user)
+            return Response({
+                'onboarding_completed': profile.onboarding_completed,
+                'has_profile': True
+            })
+        except UserProfile.DoesNotExist:
+            return Response({
+                'onboarding_completed': False,
+                'has_profile': False
+            })
+
+class UserFinancialDataView(APIView):
+    permission_classes = [IsAuthenticated]
+    
+    def get(self, request):
+        """Get user's complete financial data"""
+        try:
+            profile = UserProfile.objects.get(user=request.user)
+            incomes = Income.objects.filter(user=request.user)
+            expenses = Expense.objects.filter(user=request.user)
+            goals = SavingsGoal.objects.filter(user=request.user)
+            
+            return Response({
+                'profile': UserProfileSerializer(profile).data,
+                'incomes': IncomeSerializer(incomes, many=True).data,
+                'expenses': ExpenseSerializer(expenses, many=True).data,
+                'savings_goals': SavingsGoalSerializer(goals, many=True).data,
+            })
+        except UserProfile.DoesNotExist:
+            return Response({
+                'error': 'User profile not found. Please complete onboarding first.'
+            }, status=status.HTTP_404_NOT_FOUND)
+
+class FinancialDataView(APIView):
+    """
+    Endpoint pour récupérer les données financières de l'utilisateur
+    """
+    permission_classes = [permissions.IsAuthenticated]
+    
+    def get(self, request):
+        user = request.user
+        try:
+            profile = UserProfile.objects.get(user=user)
+            
+            # Récupérer les revenus
+            incomes = Income.objects.filter(user=user)
+            total_income = sum(income.amount for income in incomes)
+            
+            # Récupérer les dépenses fixes
+            fixed_expenses = Expense.objects.filter(user=user, type='fixed')
+            total_fixed_expenses = sum(expense.amount for expense in fixed_expenses)
+            
+            # Récupérer les dépenses variables
+            variable_expenses = Expense.objects.filter(user=user, type='variable')
+            total_variable_expenses = sum(expense.amount for expense in variable_expenses)
+            
+            total_expenses = total_fixed_expenses + total_variable_expenses
+            remaining_budget = total_income - total_expenses
+            
+            # Récupérer les objectifs d'épargne
+            savings_goals = SavingsGoal.objects.filter(user=user)
+            
+            return Response({
+                'monthly_income': profile.monthly_income,
+                'total_income': total_income,
+                'total_expenses': total_expenses,
+                'total_fixed_expenses': total_fixed_expenses,
+                'total_variable_expenses': total_variable_expenses,
+                'remaining_budget': remaining_budget,
+                'incomes': [{
+                    'id': income.id,
+                    'name': income.name,
+                    'amount': income.amount,
+                    'type': income.type,
+                    'frequency': income.frequency,
+                    'is_primary': income.is_primary
+                } for income in incomes],
+                'fixed_expenses': [{
+                    'id': expense.id,
+                    'name': expense.name,
+                    'amount': expense.amount,
+                    'frequency': expense.frequency,
+                    'type': expense.type
+                } for expense in fixed_expenses],
+                'variable_expenses': [{
+                    'id': expense.id,
+                    'name': expense.name,
+                    'amount': expense.amount,
+                    'frequency': expense.frequency,
+                    'type': expense.type
+                } for expense in variable_expenses],
+                'savings_goals': [{
+                    'id': goal.id,
+                    'name': goal.name,
+                    'target_amount': goal.target_amount,
+                    'current_amount': goal.current_amount,
+                    'target_date': goal.target_date,
+                    'type': goal.type,
+                    'priority': goal.priority
+                } for goal in savings_goals]
+            })
+            
+        except UserProfile.DoesNotExist:
+            return Response({'error': 'Profile not found'}, status=404)
