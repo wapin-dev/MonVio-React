@@ -2,12 +2,17 @@ import React, { useEffect, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { HomeIcon, CreditCardIcon, PieChartIcon, TagIcon, HistoryIcon, UserIcon, SettingsIcon, MenuIcon, XIcon, LogOutIcon, ChevronRightIcon, BellIcon, SearchIcon, TrendingUpIcon } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
-const Layout = ({
+
+interface LayoutProps {
+  children: React.ReactNode;
+}
+
+const Layout: React.FC<LayoutProps> = ({
   children
 }) => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [activeTab, setActiveTab] = useState('/');
-  const [hoveredTab, setHoveredTab] = useState(null);
+  const [hoveredTab, setHoveredTab] = useState<string | null>(null);
   const [scrolled, setScrolled] = useState(false);
   const location = useLocation();
   const {
@@ -163,7 +168,7 @@ const Layout = ({
               </div>
               <div className="ml-3">
                 <p className="text-sm font-medium text-gray-100">
-                  {user?.name || 'Utilisateur'}
+                  {user?.username || 'Utilisateur'}
                 </p>
                 <p className="text-xs text-gray-400">
                   {user?.email || 'utilisateur@example.com'}
@@ -210,7 +215,7 @@ const Layout = ({
               <div className="flex items-center space-x-4">
                 <div className="flex flex-col items-end">
                   <span className="text-sm font-medium text-gray-100">
-                    {user?.name || 'Utilisateur'}
+                    {user?.username || 'Utilisateur'}
                   </span>
                   <span className="text-xs text-gray-400">
                     {user?.email || 'utilisateur@example.com'}

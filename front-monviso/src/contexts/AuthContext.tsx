@@ -6,6 +6,8 @@ interface User {
   id: number;
   username: string;
   email: string;
+  first_name?: string;
+  last_name?: string;
   monthly_income?: number;
   setup_completed?: boolean;
 }

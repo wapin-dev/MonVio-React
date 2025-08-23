@@ -1,6 +1,10 @@
 import React from 'react';
 import { SaveIcon, UserIcon, BellIcon, LockIcon, LogOutIcon, CreditCardIcon } from 'lucide-react';
+import { useAuth } from '../contexts/AuthContext';
+
 const UserProfile = () => {
+  const { user } = useAuth();
+  
   return <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-gray-900">Profil utilisateur</h1>
@@ -16,10 +20,10 @@ const UserProfile = () => {
                 </div>
                 <div className="ml-4">
                   <h2 className="text-lg font-medium text-gray-900">
-                    Jean Dupont
+                    {user?.username || 'Utilisateur'}
                   </h2>
                   <p className="text-sm text-gray-500">
-                    jean.dupont@example.com
+                    {user?.email || 'email@example.com'}
                   </p>
                 </div>
               </div>
@@ -28,22 +32,6 @@ const UserProfile = () => {
                   <button className="flex w-full items-center rounded-md bg-blue-50 px-3 py-2 text-sm font-medium text-blue-700">
                     <UserIcon size={20} className="mr-3 text-blue-500" />
                     Informations personnelles
-                  </button>
-                  <button className="flex w-full items-center rounded-md px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">
-                    <CreditCardIcon size={20} className="mr-3 text-gray-500" />
-                    Moyens de paiement
-                  </button>
-                  <button className="flex w-full items-center rounded-md px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">
-                    <div size={20} className="mr-3 text-gray-500" />
-                    Revenus
-                  </button>
-                  <button className="flex w-full items-center rounded-md px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">
-                    <BellIcon size={20} className="mr-3 text-gray-500" />
-                    Notifications
-                  </button>
-                  <button className="flex w-full items-center rounded-md px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">
-                    <LockIcon size={20} className="mr-3 text-gray-500" />
-                    Sécurité
                   </button>
                 </nav>
               </div>
@@ -70,25 +58,19 @@ const UserProfile = () => {
                     <label htmlFor="first-name" className="block text-sm font-medium text-gray-700">
                       Prénom
                     </label>
-                    <input type="text" name="first-name" id="first-name" defaultValue="Jean" className="mt-1 block w-full rounded-md border-gray-300 focus:border-blue-500 focus:ring-blue-500" />
+                    <input type="text" name="first-name" id="first-name" defaultValue={user?.first_name || 'Inconnue'} className="mt-1 block w-full rounded-md border-gray-300 focus:border-blue-500 focus:ring-blue-500" />
                   </div>
                   <div>
                     <label htmlFor="last-name" className="block text-sm font-medium text-gray-700">
-                      Nom
+                      Nom de famille
                     </label>
-                    <input type="text" name="last-name" id="last-name" defaultValue="Dupont" className="mt-1 block w-full rounded-md border-gray-300 focus:border-blue-500 focus:ring-blue-500" />
+                    <input type="text" name="last-name" id="last-name" defaultValue={user?.last_name || 'Inconnue'} className="mt-1 block w-full rounded-md border-gray-300 focus:border-blue-500 focus:ring-blue-500" />
                   </div>
                   <div>
                     <label htmlFor="email" className="block text-sm font-medium text-gray-700">
                       Email
                     </label>
-                    <input type="email" name="email" id="email" defaultValue="jean.dupont@example.com" className="mt-1 block w-full rounded-md border-gray-300 focus:border-blue-500 focus:ring-blue-500" />
-                  </div>
-                  <div>
-                    <label htmlFor="phone" className="block text-sm font-medium text-gray-700">
-                      Téléphone
-                    </label>
-                    <input type="tel" name="phone" id="phone" defaultValue="06 12 34 56 78" className="mt-1 block w-full rounded-md border-gray-300 focus:border-blue-500 focus:ring-blue-500" />
+                    <input type="email" name="email" id="email" defaultValue={user?.email || 'jean.dupont@example.com'} className="mt-1 block w-full rounded-md border-gray-300 focus:border-blue-500 focus:ring-blue-500" />
                   </div>
                 </div>
                 <div className="flex justify-end">
@@ -117,7 +99,7 @@ const UserProfile = () => {
                       Revenu mensuel net
                     </label>
                     <div className="mt-1 relative rounded-md shadow-sm">
-                      <input type="text" name="monthly-income" id="monthly-income" defaultValue="2400" className="mt-1 block w-full rounded-md border-gray-300 focus:border-blue-500 focus:ring-blue-500 pl-3 pr-12" />
+                      <input type="text" name="monthly-income" id="monthly-income" defaultValue={user?.monthly_income?.toString() || '2400'} className="mt-1 block w-full rounded-md border-gray-300 focus:border-blue-500 focus:ring-blue-500 pl-3 pr-12" />
                       <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
                         <span className="text-gray-500 sm:text-sm">€</span>
                       </div>
