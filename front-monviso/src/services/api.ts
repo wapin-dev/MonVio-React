@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 // Configuration de base d'Axios
-const API_URL = 'http://localhost:8001/api/';  // Ajustez selon votre configuration
+const API_URL = '/api/';  // Ajustez selon votre configuration
 
 // Création d'une instance axios avec la configuration de base
 const api = axios.create({
@@ -26,21 +26,31 @@ api.interceptors.request.use(
 // Fonctions pour l'authentification
 export const authService = {
   login: async (username: string, password: string) => {
-    const response = await api.post('token/', { username, password });
+    console.log(' [DEBUG] authService.login appelé avec:', { username, password: '***' });
+    const payload = { email: username, password };
+    console.log(' [DEBUG] Payload envoyé au backend:', { email: username, password: '***' });
+    
+    const response = await api.post('auth/login/', payload);
+    console.log(' [DEBUG] Réponse du backend:', response.status, response.data);
+    
     localStorage.setItem('access_token', response.data.access);
     localStorage.setItem('refresh_token', response.data.refresh);
     return response.data;
   },
   
   register: async (username: string, email: string, password: string) => {
-    return await api.post('register/', { username, email, password });
+    return await api.post('auth/register/', { 
+      username, 
+      email, 
+      password 
+    });
   },
   
   refreshToken: async () => {
     const refreshToken = localStorage.getItem('refresh_token');
     if (!refreshToken) throw new Error('No refresh token available');
     
-    const response = await api.post('token/refresh/', { refresh: refreshToken });
+    const response = await api.post('auth/token/refresh/', { refresh: refreshToken });
     localStorage.setItem('access_token', response.data.access);
     return response.data;
   },

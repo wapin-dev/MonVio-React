@@ -14,7 +14,7 @@ interface AuthContextType {
   user: User | null;
   isAuthenticated: boolean;
   isLoading: boolean;
-  login: (username: string, password: string) => Promise<void>;
+  login: (email: string, password: string) => Promise<void>;
   signup: (username: string, email: string, password: string) => Promise<void>;
   logout: () => void;
 }
@@ -60,11 +60,11 @@ export const AuthProvider: React.FC<{
     checkAuth();
   }, []);
 
-  const login = async (username: string, password: string) => {
+  const login = async (email: string, password: string) => {
     setIsLoading(true);
     try {
       // Appeler l'API pour se connecter
-      const authResponse = await authService.login(username, password);
+      const authResponse = await authService.login(email, password);
       
       // Récupérer les informations de l'utilisateur
       const userResponse = await budgetService.getUserProfile();
@@ -86,7 +86,7 @@ export const AuthProvider: React.FC<{
       await authService.register(username, email, password);
       
       // Se connecter automatiquement après l'inscription
-      await login(username, password);
+      await login(email, password);
     } catch (error) {
       console.error('Erreur d\'inscription:', error);
       throw error;

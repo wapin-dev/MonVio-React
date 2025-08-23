@@ -1,32 +1,40 @@
 import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { ArrowLeftIcon, EyeIcon, EyeOffIcon } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
+
 const Login = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const navigate = useNavigate();
+  
   const {
     login
   } = useAuth();
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email || !password) {
       setError('Veuillez remplir tous les champs');
       return;
     }
+
     try {
       setError('');
       setIsSubmitting(true);
       await login(email, password);
-    } catch (err) {
-      setError('Identifiants incorrects. Veuillez réessayer.');
+      navigate('/'); // Redirection après connexion réussie
+    } catch (err: any) {
+      console.error('Erreur de connexion:', err);
+      setError(err.response?.data?.error || 'Identifiants incorrects. Veuillez réessayer.');
     } finally {
       setIsSubmitting(false);
     }
   };
+
   return <div className="min-h-screen bg-gradient-to-br from-gray-900 via-blue-900 to-purple-900 flex items-center justify-center p-4">
       <div className="absolute top-6 left-6">
         <Link to="/get-started" className="flex items-center text-gray-300 hover:text-white transition-colors">
@@ -94,4 +102,5 @@ const Login = () => {
       </div>
     </div>;
 };
+
 export default Login;
