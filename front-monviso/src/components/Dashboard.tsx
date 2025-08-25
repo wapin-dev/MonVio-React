@@ -109,7 +109,7 @@ const Dashboard = () => {
 
       // Create bar chart data (revenues, fixed expenses, variable expenses)
     const barData = [
-      { name: 'Revenus', amount: response.data.total_income, color: '#a78bfa', type: 'revenus' },
+      { name: 'Revenus', amount: response.data.total_income, color: '#a78bfa', type: 'revenus'},
       { name: 'Dépenses fixes', amount: response.data.total_fixed_expenses, color: '#f472b6', type: 'depenses_fixes' },
       { name: 'Dépenses variables', amount: response.data.total_variable_expenses, color: '#6366f1', type: 'depenses_variables' }
     ];
@@ -266,7 +266,8 @@ const Dashboard = () => {
                     borderRadius: '0.5rem',
                     boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.2)',
                     backdropFilter: 'blur(8px)',
-                    color: '#e2e8f0'
+                    color: '#e2e8f0',
+                    className:'font-bold text-blue-400'
                   }} formatter={value => [`${value} €`, null]} />
                   </PieChart>
                 </ResponsiveContainer>

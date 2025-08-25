@@ -94,7 +94,7 @@ const Layout: React.FC<LayoutProps> = ({
       <div className={`fixed inset-y-0 left-0 z-30 w-64 transform bg-gradient-to-b from-gray-900 via-gray-900 to-black border-r border-gray-800/50 backdrop-blur-md shadow-2xl transition-all duration-300 ease-in-out lg:translate-x-0 lg:static lg:inset-0 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
         <div className="flex h-full flex-col">
           {/* Logo area */}
-          <div className="flex items-center justify-between px-4 py-6">
+          <div className="flex items-center justify-between px-4 pt-6 pb-2">
             <div className="flex items-center group cursor-pointer" onClick={() => navigate('/')}>
               <div className="relative">
                 <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-blue-400 to-purple-600 shadow-lg shadow-blue-500/30 flex items-center justify-center overflow-hidden">
@@ -109,7 +109,7 @@ const Layout: React.FC<LayoutProps> = ({
           </div>
 
           {/* Navigation */}
-          <nav className="mt-4 flex-1 space-y-2 px-3 py-4">
+          <nav className="mt-2 flex-1 space-y-2 px-3 py-4">
             {navigationItems.map(item => {
             const isActive = activeTab === item.path;
             const isHovered = hoveredTab === item.path;
@@ -162,12 +162,12 @@ const Layout: React.FC<LayoutProps> = ({
           {/* User and logout */}
           <div className="border-t border-gray-800/50 p-4">
             <div className="flex items-center mb-4 p-2 rounded-xl hover:bg-gray-800/30 transition-colors cursor-pointer">
-              <div className="h-9 w-9 rounded-full bg-gradient-to-br from-blue-400 to-purple-600 flex items-center justify-center shadow-lg shadow-blue-700/20">
+              <div className="h-9 w-9 rounded-full bg-gradient-to-br from-blue-400 to-purple-600 flex items-center justify-center shadow-lg shadow-blue-700/20" onClick={() => navigate('/profile')} title="Voir le profil">
                 <UserIcon size={16} className="text-white" />
               </div>
               <div className="ml-3">
                 <p className="text-sm font-medium text-gray-100">
-                  {user?.username || 'Utilisateur'}
+                  {user?.first_name || 'Utilisateur'}
                 </p>
                 <p className="text-xs text-gray-400">
                   {user?.email || 'utilisateur@example.com'}
@@ -214,13 +214,13 @@ const Layout: React.FC<LayoutProps> = ({
               <div className="flex items-center space-x-4">
                 <div className="flex flex-col items-end">
                   <span className="text-sm font-medium text-gray-100">
-                    {user?.username || 'Utilisateur'}
+                    {user?.first_name || 'Utilisateur'}
                   </span>
                   <span className="text-xs text-gray-400">
                     {user?.email || 'utilisateur@example.com'}
                   </span>
                 </div>
-                <div className="h-9 w-9 rounded-full bg-gradient-to-br from-blue-400 to-purple-600 flex items-center justify-center shadow-lg shadow-blue-700/20 cursor-pointer hover:shadow-blue-700/40 transition-shadow">
+                <div className="h-9 w-9 rounded-full bg-gradient-to-br from-blue-400 to-purple-600 flex items-center justify-center shadow-lg shadow-blue-700/20 cursor-pointer hover:shadow-blue-700/40 transition-shadow" onClick={() => navigate('/profile')} title="Voir le profil">
                   <UserIcon size={16} className="text-white" />
                 </div>
               </div>
