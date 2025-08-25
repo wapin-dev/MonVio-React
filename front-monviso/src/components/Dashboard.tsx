@@ -74,25 +74,44 @@ const Dashboard = () => {
       setFinancialData(response.data);
 
       // Create pie chart data from expenses
+      const fixedColors = [
+        '#6366f1', // indigo-500
+        '#a78bfa', // purple-400
+        '#f472b6', // pink-400
+        '#facc15', // yellow-400
+        '#34d399', // green-400
+        '#f87171', // red-400
+        '#60a5fa', // blue-400
+      ];
+      const variableColors = [
+        '#3b82f6', // blue-500
+        '#06b6d4', // cyan-500
+        '#f59e42', // orange-400
+        '#fbbf24', // yellow-400
+        '#10b981', // emerald-500
+        '#818cf8', // indigo-400
+        '#c084fc', // purple-400
+      ];
+
       const pieData = [
-        ...response.data.fixed_expenses.map((expense: Expense) => ({
+        ...response.data.fixed_expenses.map((expense: Expense, i: number) => ({
           name: expense.name,
           value: expense.amount,
-          color: '#ef4444'
+          color: fixedColors[i % fixedColors.length],
         })),
-        ...response.data.variable_expenses.map((expense: Expense) => ({
+        ...response.data.variable_expenses.map((expense: Expense, i: number) => ({
           name: expense.name,
           value: expense.amount,
-          color: '#3b82f6'
-        }))
+          color: variableColors[i % variableColors.length],
+        })),
       ];
       setPieData(pieData);
 
       // Create bar chart data (revenues, fixed expenses, variable expenses)
     const barData = [
-      { name: 'Revenus', amount: response.data.total_income, color: '#10b981', type: 'revenus' },
-      { name: 'Dépenses fixes', amount: response.data.total_fixed_expenses, color: '#ef4444', type: 'depenses_fixes' },
-      { name: 'Dépenses variables', amount: response.data.total_variable_expenses, color: '#3b82f6', type: 'depenses_variables' }
+      { name: 'Revenus', amount: response.data.total_income, color: '#a78bfa', type: 'revenus' },
+      { name: 'Dépenses fixes', amount: response.data.total_fixed_expenses, color: '#f472b6', type: 'depenses_fixes' },
+      { name: 'Dépenses variables', amount: response.data.total_variable_expenses, color: '#6366f1', type: 'depenses_variables' }
     ];
       setBarData(barData);
 
@@ -239,7 +258,7 @@ const Dashboard = () => {
                     name,
                     percent
                   }) => `${name} ${(percent * 100).toFixed(0)}%`}>
-                      {pieData.map((entry, index) => <Cell key={`cell-${index}`} fill={entry.color} stroke="rgba(0, 0, 0, 0.2)" strokeWidth={1} />)}
+                      {pieData.map((entry, index) => <Cell key={`cell-${index}`} fill={entry.color} stroke="rgba(0, 0, 0, 0.2)" strokeWidth={0} />)}
                     </Pie>
                     <Tooltip contentStyle={{
                     backgroundColor: 'rgba(15, 23, 42, 0.8)',
