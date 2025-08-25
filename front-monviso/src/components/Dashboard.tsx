@@ -88,12 +88,12 @@ const Dashboard = () => {
       ];
       setPieData(pieData);
 
-      // Create bar chart data (simplified for now)
-      const barData = [
-        { name: 'Revenus', amount: response.data.total_income, color: '#10b981' },
-        { name: 'Dépenses fixes', amount: response.data.total_fixed_expenses, color: '#ef4444' },
-        { name: 'Dépenses variables', amount: response.data.total_variable_expenses, color: '#3b82f6' }
-      ];
+      // Create bar chart data (revenues, fixed expenses, variable expenses)
+    const barData = [
+      { name: 'Revenus', amount: response.data.total_income, color: '#10b981', type: 'revenus' },
+      { name: 'Dépenses fixes', amount: response.data.total_fixed_expenses, color: '#ef4444', type: 'depenses_fixes' },
+      { name: 'Dépenses variables', amount: response.data.total_variable_expenses, color: '#3b82f6', type: 'depenses_variables' }
+    ];
       setBarData(barData);
 
     } catch (err) {
@@ -117,6 +117,7 @@ const Dashboard = () => {
     gridLines: 'rgba(148, 163, 184, 0.2)',
     text: '#e2e8f0'
   };
+ console.log(financialData?.fixed_expenses);
 
   return (
     <div className="space-y-6">
@@ -281,14 +282,23 @@ const Dashboard = () => {
                     <XAxis dataKey="name" stroke={chartColors.text} />
                     <YAxis stroke={chartColors.text} />
                     <Tooltip contentStyle={{
-                    backgroundColor: 'rgba(15, 23, 42, 0.8)',
-                    borderColor: 'rgba(100, 116, 139, 0.3)',
-                    borderRadius: '0.5rem',
-                    boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.2)',
-                    backdropFilter: 'blur(8px)',
-                    color: '#e2e8f0'
-                  }} formatter={value => [`${value} €`, null]} />
-                    {barData.map((item, index) => <Bar key={item.name} dataKey="amount" fill={item.color} name={item.name} />)}
+                      backgroundColor: 'rgba(15, 23, 42, 0.8)',
+                      borderColor: 'rgba(100, 116, 139, 0.3)',
+                      borderRadius: '0.5rem',
+                      boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.2)',
+                      backdropFilter: 'blur(8px)',
+                      color: '#e2e8f0'
+                    }} 
+                      formatter={(value: any, name: any, props: any) => {
+                        const item = barData.find((item) => item.name === props.payload.name);
+                        const color = item ? item.color : 'white';
+                        return [`${value} €`, <span style={{ color }}>{props.payload.name}</span>];
+                      }} />
+                    <Bar dataKey="amount" name="Montants">
+                      {barData.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.color} />
+                      ))}
+                    </Bar>
                   </BarChart>
                 </ResponsiveContainer>
               </div>
@@ -332,18 +342,18 @@ const Dashboard = () => {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-700/30 bg-transparent">
-                      {financialData?.incomes.map((income: Income) => <tr key={income.id} className="hover:bg-white/5 transition-colors">
+                      {[...financialData?.incomes ?? [], ...financialData?.fixed_expenses ?? [], ...financialData?.variable_expenses ?? []].map((item: Income | Expense) =>  <tr key={item.id} className="hover:bg-white/5 transition-colors">
                           <td className="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-100 sm:pl-0">
-                            {income.name}
+                            {item.name}
                           </td>
                           <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-300">
-                            {income.type}
+                            {item.type == 'salary' ? 'Revenu' : 'Dépense'}
                           </td>
                           <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-300">
-                            {income.frequency}
+                            {item.frequency == 'monthly' ? 'Mensuel' : item.frequency == 'yearly' ? 'Annuel' : 'Unique'}
                           </td>
-                          <td className={`whitespace-nowrap px-3 py-4 text-sm text-right ${income.amount >= 0 ? 'text-green-400 font-medium' : 'text-red-400 font-medium'}`}>
-                            {income.amount >= 0 ? `+${income.amount.toFixed(2)} €` : `${income.amount.toFixed(2)} €`}
+                          <td className={`whitespace-nowrap px-3 py-4 text-sm text-right ${item.type === 'salary' ? 'text-green-400 font-medium' : 'text-red-400 font-medium'}`}>
+                            {item.type === 'salary' ? `+${item.amount.toFixed(2)} €` : `- ${Math.abs(item.amount).toFixed(2)} €`}
                           </td>
                         </tr>)}
                     </tbody>

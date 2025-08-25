@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import  '../assets/styles/logo.css';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { HomeIcon, CreditCardIcon, PieChartIcon, TagIcon, HistoryIcon, UserIcon, SettingsIcon, MenuIcon, XIcon, LogOutIcon, ChevronRightIcon, BellIcon, SearchIcon, TrendingUpIcon } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
@@ -6,6 +7,9 @@ import { useAuth } from '../contexts/AuthContext';
 interface LayoutProps {
   children: React.ReactNode;
 }
+//les liens des images doivent être en relatif pour fonctionner dans le build final
+const MonViso = '/images/logos/monviso.svg';
+
 
 const Layout: React.FC<LayoutProps> = ({
   children
@@ -94,16 +98,10 @@ const Layout: React.FC<LayoutProps> = ({
             <div className="flex items-center group cursor-pointer" onClick={() => navigate('/')}>
               <div className="relative">
                 <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-blue-400 to-purple-600 shadow-lg shadow-blue-500/30 flex items-center justify-center overflow-hidden">
-                  <div className="absolute inset-0 bg-gradient-to-br from-blue-500 to-purple-700 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-                  <span className="text-white font-bold text-lg relative z-10">
-                    M
-                  </span>
+                  <img src={MonViso} alt="Logo Monviso" className="w-full h-full monviso-logo text-transparent bg-clip-text"/>
                 </div>
                 <div className="absolute -inset-0.5 rounded-xl bg-gradient-to-r from-blue-400 to-purple-600 opacity-0 group-hover:opacity-30 blur-md transition-opacity duration-300"></div>
               </div>
-              <span className="ml-3 text-xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-purple-400">
-                monviso
-              </span>
             </div>
             <button onClick={toggleSidebar} className="lg:hidden rounded-full p-1.5 text-gray-400 hover:bg-gray-800/50 hover:text-white transition-colors">
               <XIcon size={20} />
