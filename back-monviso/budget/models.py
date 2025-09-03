@@ -98,3 +98,41 @@ class SavingsGoal(models.Model):
         if self.target_amount > 0:
             return min(100, (self.current_amount / self.target_amount) * 100)
         return 0
+
+class Transaction(models.Model):
+    TRANSACTION_TYPES = [
+        ('income', 'Revenu'),
+        ('expense', 'Dépense'),
+    ]
+    
+    FREQUENCY_CHOICES = [
+        ('unique', 'Unique'),
+        ('mensuel', 'Mensuel'),
+        ('trimestriel', 'Trimestriel'),
+        ('annuel', 'Annuel'),
+    ]
+    
+    PAYMENT_METHODS = [
+        ('cash', 'Espèces'),
+        ('card', 'Carte Bancaire'),
+        ('transfer', 'Virement'),
+        ('check', 'Chèque'),
+        ('other', 'Autre'),
+    ]
+    
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='transactions')
+    name = models.CharField(max_length=100)
+    amount = models.DecimalField(max_digits=10, decimal_places=2)
+    type = models.CharField(max_length=10, choices=TRANSACTION_TYPES)
+    category = models.CharField(max_length=100, blank=True)
+    date = models.DateField()
+    payment_method = models.CharField(max_length=20, choices=PAYMENT_METHODS, blank=True)
+    frequency = models.CharField(max_length=20, choices=FREQUENCY_CHOICES, default='unique')
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-date', '-created_at']
+
+    def __str__(self):
+        return f"{self.name} - {self.amount}€ ({self.date})"

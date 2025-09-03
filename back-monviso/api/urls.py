@@ -1,6 +1,6 @@
 from django.urls import path
 from rest_framework_simplejwt.views import TokenRefreshView
-from .views import LoginView, RegisterView, TestConnectionView, ProfileView, OnboardingView, OnboardingStatusView, FinancialDataView
+from .views import LoginView, RegisterView, TestConnectionView, ProfileView, OnboardingView, OnboardingStatusView, FinancialDataView, TransactionListCreateView, TransactionDetailView
 
 urlpatterns = [
     path('test/', TestConnectionView.as_view(), name='test_connection'),
@@ -11,4 +11,7 @@ urlpatterns = [
     path('onboarding/', OnboardingView.as_view(), name='onboarding'),
     path('onboarding/status/', OnboardingStatusView.as_view(), name='onboarding_status'),
     path('dashboard/', FinancialDataView.as_view(), name='dashboard_data'),
+    path('financial-data/', FinancialDataView.as_view(), name='financial_data'),
+    path('transactions/', TransactionListCreateView.as_view(), name='transactions'),
+    path('transactions/<int:pk>/', TransactionDetailView.as_view(), name='transaction_detail'),
 ]

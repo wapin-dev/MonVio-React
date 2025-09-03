@@ -1,6 +1,6 @@
 from rest_framework import serializers
 from django.contrib.auth.models import User
-from budget.models import UserProfile, Income, Expense, SavingsGoal, Category
+from budget.models import UserProfile, Income, Expense, SavingsGoal, Category, Transaction
 
 class UserProfileSerializer(serializers.ModelSerializer):
     class Meta:
@@ -28,6 +28,16 @@ class CategorySerializer(serializers.ModelSerializer):
     class Meta:
         model = Category
         fields = ['id', 'name', 'type']
+
+class TransactionSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Transaction
+        fields = ['id', 'name', 'amount', 'type', 'category', 'date', 'payment_method', 'frequency', 'created_at']
+        read_only_fields = ['id', 'created_at']
+
+    def create(self, validated_data):
+        validated_data['user'] = self.context['request'].user
+        return super().create(validated_data)
 
 class OnboardingDataSerializer(serializers.Serializer):
     # Personal info

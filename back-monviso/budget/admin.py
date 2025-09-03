@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import UserProfile, Category, Income, Expense, SavingsGoal
+from .models import UserProfile, Category, Income, Expense, SavingsGoal, Transaction
 
 # Register your models here.
 
@@ -40,3 +40,11 @@ class SavingsGoalAdmin(admin.ModelAdmin):
     def progress_percentage(self, obj):
         return f"{obj.progress_percentage:.1f}%"
     progress_percentage.short_description = 'Progression'
+
+@admin.register(Transaction)
+class TransactionAdmin(admin.ModelAdmin):
+    list_display = ('name', 'amount', 'type', 'user', 'category', 'date', 'payment_method', 'frequency')
+    list_filter = ('type', 'payment_method', 'frequency', 'date', 'created_at')
+    search_fields = ('name', 'user__username', 'category')
+    readonly_fields = ('created_at', 'updated_at')
+    date_hierarchy = 'date'

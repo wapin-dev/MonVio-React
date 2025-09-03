@@ -266,8 +266,8 @@ const Dashboard = () => {
                     borderRadius: '0.5rem',
                     boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.2)',
                     backdropFilter: 'blur(8px)',
-                    color: '#e2e8f0',
-                    className:'font-bold text-blue-400'
+                    color: '#60a5fa',
+                    fontWeight: 'bold'
                   }} formatter={value => [`${value} €`, null]} />
                   </PieChart>
                 </ResponsiveContainer>
