@@ -11,6 +11,8 @@ import { categoryService } from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
 import type { AxiosError } from 'axios';
 
+const ICON_OPTIONS = ['💳', '💰', '🏠', '🛒', '🍽️', '🚗', '🚌', '🎉', '🎮', '🎁', '📚', '🏥', '💊', '💡', '📱', '🛠️', '🧾', '✈️', '🌍', '👕', '🏖️', '🏋️', '🎓', '🐾'];
+
 const toNumber = (value: number | string | null | undefined): number => {
   if (value === null || value === undefined) return 0;
   return typeof value === 'number' ? value : parseFloat(value);
@@ -409,7 +411,7 @@ const CategoryManagement: React.FC = () => {
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div>
                   <label className="block text-xs font-semibold uppercase tracking-wide text-gray-400">
-                    Icône (emoji)
+                    Icône
                   </label>
                   <input
                     type="text"
@@ -419,6 +421,22 @@ const CategoryManagement: React.FC = () => {
                     className="mt-2 w-full rounded-xl border border-slate-600/60 bg-slate-800/40 px-3 py-2 text-sm text-white focus:border-blue-400 focus:outline-none"
                     placeholder="💳"
                   />
+                  <div className="mt-3 grid grid-cols-6 gap-2 sm:grid-cols-8">
+                    {ICON_OPTIONS.map((emoji) => (
+                      <button
+                        type="button"
+                        key={emoji}
+                        onClick={() => setForm((prev) => ({ ...prev, icon: emoji }))}
+                        className={`flex items-center justify-center rounded-xl border px-2 py-2 text-lg transition ${
+                          form.icon === emoji
+                            ? 'border-blue-500/70 bg-blue-500/20 text-blue-100'
+                            : 'border-slate-600/60 bg-slate-800/40 text-slate-200 hover:bg-slate-700/40'
+                        }`}
+                      >
+                        {emoji}
+                      </button>
+                    ))}
+                  </div>
                 </div>
                 <div>
                   <label className="block text-xs font-semibold uppercase tracking-wide text-gray-400">

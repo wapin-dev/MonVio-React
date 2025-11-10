@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { PlusIcon, FilterIcon, SearchIcon, ChevronDownIcon, ChevronUpIcon, TrashIcon, EditIcon, XIcon } from 'lucide-react';
 import { onboardingService, transactionService } from '../services/api';
+import { useSearchParams } from 'react-router-dom';
 
 interface Income {
   id: number;
@@ -59,6 +60,8 @@ const TransactionManagement = () => {
     paymentMethod: '',
     frequency: 'unique'
   });
+
+  const [searchParams, setSearchParams] = useSearchParams();
 
   // Récupérer les données financières au chargement du composant
   useEffect(() => {
@@ -157,6 +160,16 @@ const TransactionManagement = () => {
 
     fetchFinancialData();
   }, []);
+
+  useEffect(() => {
+    const shouldOpenModal = searchParams.get('new') === '1';
+    if (shouldOpenModal && !showNewTransactionModal) {
+      setShowNewTransactionModal(true);
+      const next = new URLSearchParams(searchParams);
+      next.delete('new');
+      setSearchParams(next, { replace: true });
+    }
+  }, [searchParams, setSearchParams, showNewTransactionModal]);
 
   const categories = ['Toutes les catégories', ...Array.from(new Set(transactions.map(t => t.category)))];
   const paymentMethods = ['Tous les moyens', ...Array.from(new Set(transactions.map(t => t.paymentMethod)))];
@@ -505,7 +518,8 @@ const TransactionManagement = () => {
       </div>
     );
   }
-  return <div className="space-y-6">
+  return (
+    <div className="space-y-6 pb-24 sm:pb-6">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-blue-300 to-purple-300">
           Gestion des transactions
@@ -573,56 +587,57 @@ const TransactionManagement = () => {
       </div>
       {/* Transactions table */}
       <div className="overflow-hidden rounded-xl bg-gradient-to-br from-gray-800/70 to-gray-900/70 backdrop-blur-md border border-gray-700/50 shadow-xl">
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-700/30">
+        <div className="max-w-full">
+          <table className="w-full table-auto divide-y divide-gray-700/30">
             <thead className="bg-gray-800/50">
               <tr>
-                <th scope="col" className="px-6 py-3.5 text-left text-xs font-medium uppercase tracking-wider text-gray-300">
+                <th scope="col" className="px-4 py-3.5 text-left text-xs font-medium uppercase tracking-wider text-gray-300">
                   Date
                 </th>
-                <th scope="col" className="px-6 py-3.5 text-left text-xs font-medium uppercase tracking-wider text-gray-300">
+                <th scope="col" className="px-4 py-3.5 text-left text-xs font-medium uppercase tracking-wider text-gray-300">
                   Description
                 </th>
-                <th scope="col" className="px-6 py-3.5 text-left text-xs font-medium uppercase tracking-wider text-gray-300">
+                <th scope="col" className="px-4 py-3.5 text-left text-xs font-medium uppercase tracking-wider text-gray-300">
                   Catégorie
                 </th>
-                <th scope="col" className="px-6 py-3.5 text-left text-xs font-medium uppercase tracking-wider text-gray-300">
+                <th scope="col" className="px-4 py-3.5 text-left text-xs font-medium uppercase tracking-wider text-gray-300">
                   Moyen de paiement
                 </th>
-                <th scope="col" className="px-6 py-3.5 text-right text-xs font-medium uppercase tracking-wider text-gray-300">
+                <th scope="col" className="px-4 py-3.5 text-right text-xs font-medium uppercase tracking-wider text-gray-300">
                   Montant
                 </th>
-                <th scope="col" className="px-6 py-3.5 text-right text-xs font-medium uppercase tracking-wider text-gray-300">
+                <th scope="col" className="px-4 py-3.5 text-right text-xs font-medium uppercase tracking-wider text-gray-300">
                   Actions
                 </th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-700/30 bg-transparent">
-              {currentTransactions.map(transaction => <tr key={transaction.id} className="hover:bg-white/5 transition-colors">
-                  <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-300">
+              {currentTransactions.map(transaction => (
+                <tr key={transaction.id} className="hover:bg-white/5 transition-colors">
+                  <td className="px-4 py-4 text-sm text-gray-300 align-top">
                     {new Date(transaction.date).toLocaleDateString('fr-FR')}
                   </td>
-                  <td className="px-6 py-4 text-sm font-medium text-gray-100">
+                  <td className="px-4 py-4 text-sm font-medium text-gray-100 align-top break-words">
                     {transaction.name}
                   </td>
-                  <td className="px-6 py-4 text-sm text-gray-300">
+                  <td className="px-4 py-4 text-sm text-gray-300 align-top break-words">
                     {transaction.category}
                   </td>
-                  <td className="px-6 py-4 text-sm text-gray-300">
+                  <td className="px-4 py-4 text-sm text-gray-300 align-top break-words">
                     {transaction.paymentMethod}
                   </td>
-                  <td className={`whitespace-nowrap px-6 py-4 text-right text-sm font-medium ${transaction.amount >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                  <td className={`px-4 py-4 text-right text-sm font-medium align-top ${transaction.amount >= 0 ? 'text-green-400' : 'text-red-400'}`}>
                     {transaction.amount >= 0 ? `+${Number(transaction.amount).toFixed(2)} €` : `${Number(transaction.amount).toFixed(2)} €`}
                   </td>
-                  <td className="whitespace-nowrap px-6 py-4 text-right text-sm">
-                    <button 
+                  <td className="px-4 py-4 text-right text-sm align-top">
+                    <button
                       onClick={() => handleEditTransaction(transaction)}
                       className="text-blue-400 hover:text-blue-300 mr-3 transition-colors"
                       title="Modifier la transaction"
                     >
                       <EditIcon size={16} />
                     </button>
-                    <button 
+                    <button
                       onClick={() => handleDeleteTransaction(transaction.id)}
                       className="text-red-400 hover:text-red-300 transition-colors"
                       title="Supprimer la transaction"
@@ -630,7 +645,8 @@ const TransactionManagement = () => {
                       <TrashIcon size={16} />
                     </button>
                   </td>
-                </tr>)}
+                </tr>
+              ))}
             </tbody>
           </table>
         </div>
@@ -673,71 +689,147 @@ const TransactionManagement = () => {
           </div>
         </div>
       </div>
+      <div className="-mt-14 flex justify-end px-6">
+        <button
+          className="hidden sm:inline-flex items-center rounded-xl bg-gradient-to-r from-blue-600 to-purple-600 px-4 py-2 text-sm font-medium text-white shadow-lg shadow-blue-700/20 hover:from-blue-700 hover:to-purple-700 transition-all duration-200"
+          onClick={() =>setShowNewTransactionModal(true)}
+        >
+          <PlusIcon size={16} className="mr-2" />
+          Ajouter une transaction
+        </button>
+      </div>
       {/* Modal de nouvelle transaction */}
-      {showNewTransactionModal && <div className="fixed inset-0 z-10 overflow-y-auto" aria-labelledby="modal-headline" role="dialog" aria-modal="true">
-        <div className="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
-          <div className="fixed inset-0 transition-opacity" aria-hidden="true">
-            <div className="absolute inset-0 bg-gray-500 opacity-75"></div>
-          </div>
-          <div className="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full" role="dialog" aria-modal="true" aria-labelledby="modal-headline">
-            <form onSubmit={handleSubmitNewTransaction} className="space-y-6">
-              <div className="bg-gray-800/50 px-4 py-3 flex items-center justify-between border-b border-gray-700/30">
-                <h2 className="text-lg font-bold text-gray-100" id="modal-headline">
-                  Nouvelle transaction
-                </h2>
-                <button type="button" onClick={closeModal} className="text-gray-400 hover:text-gray-300 transition-colors">
+      {showNewTransactionModal && (
+        <div className="fixed inset-0 z-50 flex flex-col justify-end sm:justify-center">
+          <div
+            className="absolute inset-0 bg-gray-900/70 backdrop-blur-sm"
+            onClick={closeModal}
+          />
+          <div className="relative w-full sm:max-w-lg sm:mx-auto" onClick={(e) => e.stopPropagation()}>
+            <form
+              onSubmit={handleSubmitNewTransaction}
+              className="relative flex max-h-[85vh] flex-col rounded-t-3xl border border-gray-700/40 bg-gradient-to-br from-gray-900/95 to-gray-800/95 shadow-2xl sm:rounded-2xl"
+            >
+              <div className="flex items-center justify-center py-3">
+                <div className="h-1.5 w-14 rounded-full bg-gray-600" />
+              </div>
+              <div className="flex items-center justify-between px-6 pb-4">
+                <div>
+                  <h2 className="text-lg font-bold text-gray-100" id="modal-headline">
+                    Nouvelle transaction
+                  </h2>
+                  <p className="text-xs text-gray-400">
+                    Renseignez les détails pour suivre cette dépense ou ce revenu.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={closeModal}
+                  className="rounded-full bg-gray-800/60 p-2 text-gray-300 transition hover:text-white"
+                >
                   <XIcon size={16} />
                 </button>
               </div>
-              <div className="p-6">
+
+              <div className="flex-1 space-y-6 overflow-y-auto px-6 pb-6">
                 <div>
                   <label htmlFor="name" className="block text-sm font-medium text-gray-300">
                     Nom de la transaction
                   </label>
-                  <input type="text" id="name" value={newTransaction.name} onChange={(e) => handleNewTransactionChange('name', e.target.value)} className="mt-1 block w-full rounded-xl border-0 bg-gray-800/50 backdrop-blur-md py-2 px-3 text-gray-100 focus:ring-2 focus:ring-blue-500/50 shadow-md shadow-black/10" />
+                  <input
+                    type="text"
+                    id="name"
+                    value={newTransaction.name}
+                    onChange={(e) => handleNewTransactionChange('name', e.target.value)}
+                    className="mt-1 block w-full rounded-xl border-0 bg-gray-800/60 py-2 px-3 text-gray-100 shadow-inner shadow-black/20 focus:ring-2 focus:ring-blue-500/50"
+                  />
                 </div>
-                <div>
-                  <label htmlFor="amount" className="block text-sm font-medium text-gray-300">
-                    Montant
-                  </label>
-                  <input type="number" id="amount" value={newTransaction.amount} onChange={(e) => handleNewTransactionChange('amount', e.target.value)} className="mt-1 block w-full rounded-xl border-0 bg-gray-800/50 backdrop-blur-md py-2 px-3 text-gray-100 focus:ring-2 focus:ring-blue-500/50 shadow-md shadow-black/10" />
+
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                  <div>
+                    <label htmlFor="amount" className="block text-sm font-medium text-gray-300">
+                      Montant
+                    </label>
+                    <input
+                      type="number"
+                      id="amount"
+                      value={newTransaction.amount}
+                      onChange={(e) => handleNewTransactionChange('amount', e.target.value)}
+                      className="mt-1 block w-full rounded-xl border-0 bg-gray-800/60 py-2 px-3 text-gray-100 shadow-inner shadow-black/20 focus:ring-2 focus:ring-blue-500/50"
+                    />
+                  </div>
+                  <div>
+                    <label htmlFor="type" className="block text-sm font-medium text-gray-300">
+                      Type
+                    </label>
+                    <select
+                      id="type"
+                      value={newTransaction.type}
+                      onChange={(e) => handleNewTransactionChange('type', e.target.value)}
+                      className="mt-1 block w-full rounded-xl border-0 bg-gray-800/60 py-2 px-3 text-gray-100 shadow-inner shadow-black/20 focus:ring-2 focus:ring-blue-500/50"
+                    >
+                      <option value="expense">Dépense</option>
+                      <option value="income">Revenu</option>
+                    </select>
+                  </div>
                 </div>
-                <div>
-                  <label htmlFor="type" className="block text-sm font-medium text-gray-300">
-                    Type
-                  </label>
-                  <select id="type" value={newTransaction.type} onChange={(e) => handleNewTransactionChange('type', e.target.value)} className="mt-1 block w-full rounded-xl border-0 bg-gray-800/50 backdrop-blur-md py-2 px-3 text-gray-100 focus:ring-2 focus:ring-blue-500/50 shadow-md shadow-black/10">
-                    <option>expense</option>
-                    <option>income</option>
-                  </select>
-                </div>
+
                 <div>
                   <label htmlFor="category" className="block text-sm font-medium text-gray-300">
                     Catégorie
                   </label>
-                  <select id="category" value={newTransaction.category} onChange={(e) => handleNewTransactionChange('category', e.target.value)} className="mt-1 block w-full rounded-xl border-0 bg-gray-800/50 backdrop-blur-md py-2 px-3 text-gray-100 focus:ring-2 focus:ring-blue-500/50 shadow-md shadow-black/10">
-                    {categories.map(category => <option key={category}>{category}</option>)}
+                  <select
+                    id="category"
+                    value={newTransaction.category}
+                    onChange={(e) => handleNewTransactionChange('category', e.target.value)}
+                    className="mt-1 block w-full rounded-xl border-0 bg-gray-800/60 py-2 px-3 text-gray-100 shadow-inner shadow-black/20 focus:ring-2 focus:ring-blue-500/50"
+                  >
+                    {categories.map((category) => (
+                      <option key={category}>{category}</option>
+                    ))}
                   </select>
                 </div>
-                <div>
-                  <label htmlFor="date" className="block text-sm font-medium text-gray-300">
-                    Date
-                  </label>
-                  <input type="date" id="date" value={newTransaction.date} onChange={(e) => handleNewTransactionChange('date', e.target.value)} className="mt-1 block w-full rounded-xl border-0 bg-gray-800/50 backdrop-blur-md py-2 px-3 text-gray-100 focus:ring-2 focus:ring-blue-500/50 shadow-md shadow-black/10" />
+
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                  <div>
+                    <label htmlFor="date" className="block text-sm font-medium text-gray-300">
+                      Date
+                    </label>
+                    <input
+                      type="date"
+                      id="date"
+                      value={newTransaction.date}
+                      onChange={(e) => handleNewTransactionChange('date', e.target.value)}
+                      className="mt-1 block w-full rounded-xl border-0 bg-gray-800/60 py-2 px-3 text-gray-100 shadow-inner shadow-black/20 focus:ring-2 focus:ring-blue-500/50"
+                    />
+                  </div>
+                  <div>
+                    <label htmlFor="paymentMethod" className="block text-sm font-medium text-gray-300">
+                      Moyen de paiement
+                    </label>
+                    <select
+                      id="paymentMethod"
+                      value={newTransaction.paymentMethod}
+                      onChange={(e) => handleNewTransactionChange('paymentMethod', e.target.value)}
+                      className="mt-1 block w-full rounded-xl border-0 bg-gray-800/60 py-2 px-3 text-gray-100 shadow-inner shadow-black/20 focus:ring-2 focus:ring-blue-500/50"
+                    >
+                      {paymentMethods.map((method) => (
+                        <option key={method}>{method}</option>
+                      ))}
+                    </select>
+                  </div>
                 </div>
-                <div>
-                  <label htmlFor="paymentMethod" className="block text-sm font-medium text-gray-300">
-                    Moyen de paiement
-                  </label>
-                  <select id="paymentMethod" value={newTransaction.paymentMethod} onChange={(e) => handleNewTransactionChange('paymentMethod', e.target.value)} className="mt-1 block w-full rounded-xl border-0 bg-gray-800/50 backdrop-blur-md py-2 px-3 text-gray-100 focus:ring-2 focus:ring-blue-500/50 shadow-md shadow-black/10">
-                    {paymentMethods.map(method => <option key={method}>{method}</option>)}
-                  </select>
-                </div>
+
                 <div>
                   <label htmlFor="frequency" className="block text-sm font-medium text-gray-300">
                     Fréquence
                   </label>
-                  <select id="frequency" value={newTransaction.frequency} onChange={(e) => handleNewTransactionChange('frequency', e.target.value)} className="mt-1 block w-full rounded-xl border-0 bg-gray-800/50 backdrop-blur-md py-2 px-3 text-gray-100 focus:ring-2 focus:ring-blue-500/50 shadow-md shadow-black/10">
+                  <select
+                    id="frequency"
+                    value={newTransaction.frequency}
+                    onChange={(e) => handleNewTransactionChange('frequency', e.target.value)}
+                    className="mt-1 block w-full rounded-xl border-0 bg-gray-800/60 py-2 px-3 text-gray-100 shadow-inner shadow-black/20 focus:ring-2 focus:ring-blue-500/50"
+                  >
                     <option>unique</option>
                     <option>mensuel</option>
                     <option>trimestriel</option>
@@ -745,18 +837,26 @@ const TransactionManagement = () => {
                   </select>
                 </div>
               </div>
-              <div className="bg-gray-800/50 px-4 py-3 flex items-center justify-between border-t border-gray-700/30">
-                <button type="button" onClick={closeModal} className="text-gray-400 hover:text-gray-300 transition-colors">
+
+              <div className="flex items-center justify-between px-6 py-4 border-t border-gray-700/40 bg-gray-900/70">
+                <button
+                  type="button"
+                  onClick={closeModal}
+                  className="rounded-xl px-4 py-2 text-sm font-medium text-gray-300 transition hover:text-white"
+                >
                   Annuler
                 </button>
-                <button type="submit" className="inline-flex items-center rounded-xl bg-gradient-to-r from-blue-600 to-purple-600 px-4 py-2 text-sm font-medium text-white shadow-lg shadow-blue-700/20 hover:from-blue-700 hover:to-purple-700 transition-all duration-200">
+                <button
+                  type="submit"
+                  className="inline-flex items-center rounded-xl bg-gradient-to-r from-blue-600 to-purple-600 px-5 py-2 text-sm font-medium text-white shadow-lg shadow-blue-700/20 transition hover:from-blue-700 hover:to-purple-700"
+                >
                   Enregistrer
                 </button>
               </div>
             </form>
           </div>
         </div>
-      </div>}
+      )}
       
       {/* Modal d'édition de transaction */}
       {showEditTransactionModal && editingTransaction && (
@@ -882,6 +982,7 @@ const TransactionManagement = () => {
           </div>
         </div>
       )}
-    </div>;
+    </div>
+  );
 };
 export default TransactionManagement;

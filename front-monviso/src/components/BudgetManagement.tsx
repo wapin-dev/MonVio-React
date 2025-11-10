@@ -1,5 +1,5 @@
 // @ts-nocheck
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState, useCallback } from 'react';
 import {
   RefreshCcwIcon,
   WalletIcon,
@@ -18,12 +18,26 @@ import {
   Tooltip
 } from 'recharts';
 import { useAuth } from '../contexts/AuthContext';
+import { categoryService } from '../services/api';
+
+interface CategoryBudget {
+  id: number;
+  name: string;
+  color?: string;
+  icon?: string;
+  type: 'income' | 'expense';
+  monthly_budget?: string | number | null;
+}
 
 interface AggregatedExpense {
+  id: number | 'uncategorized';
   name: string;
   total: number;
   frequency: string;
   type: 'fixed' | 'variable';
+  monthlyBudget: number | null;
+  color?: string;
+  icon?: string;
 }
 
 interface ChartDatum {
@@ -38,26 +52,50 @@ const formatCurrency = (value: number) =>
     minimumFractionDigits: 0
   });
 
+const toNumber = (value: number | string | null | undefined) => {
+  if (value === null || value === undefined) return 0;
+  return typeof value === 'number' ? value : parseFloat(value);
+};
+
 const BudgetManagement: React.FC = () => {
   const { financialData, refreshFinancialData, isLoading } = useAuth();
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [initialized, setInitialized] = useState(false);
+  const [categories, setCategories] = useState<CategoryBudget[]>([]);
+  const [isLoadingCategories, setIsLoadingCategories] = useState(true);
+
+  const loadCategories = useCallback(async () => {
+    try {
+      setIsLoadingCategories(true);
+      const response = await categoryService.getAll();
+      setCategories(response.data || []);
+    } catch (error) {
+      console.error('Erreur lors du chargement des catégories:', error);
+    } finally {
+      setIsLoadingCategories(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadCategories();
+  }, [loadCategories]);
 
   useEffect(() => {
     const bootstrap = async () => {
       if (!initialized && !financialData) {
         setIsRefreshing(true);
         await refreshFinancialData();
+        await loadCategories();
         setIsRefreshing(false);
         setInitialized(true);
       }
     };
     bootstrap();
-  }, [financialData, initialized, refreshFinancialData]);
+  }, [financialData, initialized, refreshFinancialData, loadCategories]);
 
   const handleRefresh = async () => {
     setIsRefreshing(true);
-    await refreshFinancialData();
+    await Promise.all([refreshFinancialData(), loadCategories()]);
     setIsRefreshing(false);
   };
 
@@ -66,30 +104,92 @@ const BudgetManagement: React.FC = () => {
     return [...(financialData.fixed_expenses || []), ...(financialData.variable_expenses || [])];
   }, [financialData]);
 
-  const aggregatedExpenses = useMemo<AggregatedExpense[]>(() => {
-    const map = new Map<string, AggregatedExpense>();
-
+  const expensesByCategory = useMemo(() => {
+    const map = new Map<number | 'uncategorized', { total: number; frequency: string }>;
     expenses.forEach((expense) => {
-      const key = expense.name || `cat-${expense.id}`;
-      const previous = map.get(key);
-      const total = (previous?.total || 0) + (expense.amount || 0);
-      const normalizedType: 'fixed' | 'variable' = expense.type === 'fixed' ? 'fixed' : 'variable';
-      const frequency = expense.frequency || previous?.frequency || 'unique';
+      const key = expense.category_id ?? 'uncategorized';
+      const existing = map.get(key);
+      const total = (existing?.total || 0) + (expense.amount || 0);
+      const frequency = expense.frequency || existing?.frequency || 'unique';
+      map.set(key, { total, frequency });
+    });
+    return map;
+  }, [expenses]);
 
-      map.set(key, {
-        name: expense.name || previous?.name || 'Autre',
-        total,
-        frequency,
-        type: normalizedType
-      });
+  const expenseCategories = useMemo(
+    () => categories.filter((category) => category.type === 'expense'),
+    [categories]
+  );
+
+  const aggregatedExpenses = useMemo<AggregatedExpense[]>(() => {
+    const list: AggregatedExpense[] = expenseCategories.map((category) => {
+      const stats = expensesByCategory.get(category.id);
+      const monthlyBudget = category.monthly_budget != null ? toNumber(category.monthly_budget) : null;
+      return {
+        id: category.id,
+        name: category.name,
+        total: stats?.total || 0,
+        frequency: stats?.frequency || 'unique',
+        type: 'fixed',
+        monthlyBudget,
+        color: category.color || '#6366F1',
+        icon: category.icon || '💳'
+      };
     });
 
-    return Array.from(map.values()).sort((a, b) => b.total - a.total);
-  }, [expenses]);
+    const uncategorized = expensesByCategory.get('uncategorized');
+    if (uncategorized && uncategorized.total > 0) {
+      list.push({
+        id: 'uncategorized',
+        name: 'Non catégorisé',
+        total: uncategorized.total,
+        frequency: uncategorized.frequency,
+        type: 'variable',
+        monthlyBudget: null,
+        color: '#94A3B8',
+        icon: '📦'
+      });
+    }
+
+    // Include any expense that belongs to a category not present (e.g., deleted)
+    expenses.forEach((expense) => {
+      if (expense.category_id && !expenseCategories.find((cat) => cat.id === expense.category_id)) {
+        const existing = list.find((item) => item.id === expense.category_id);
+        if (existing) {
+          existing.total += expense.amount || 0;
+        } else {
+          list.push({
+            id: expense.category_id,
+            name: expense.category_name || 'Catégorie inconnue',
+            total: expense.amount || 0,
+            frequency: expense.frequency || 'unique',
+            type: 'variable',
+            monthlyBudget: null,
+            color: '#94A3B8',
+            icon: '📦'
+          });
+        }
+      }
+    });
+
+    return list.sort((a, b) => b.total - a.total);
+  }, [expenseCategories, expensesByCategory, expenses]);
 
   const totalSpent = useMemo(
     () => expenses.reduce((sum, exp) => sum + (exp.amount || 0), 0),
     [expenses]
+  );
+
+  const totalBudget = useMemo(
+    () => aggregatedExpenses.reduce((sum, item) => sum + (item.monthlyBudget || 0), 0),
+    [aggregatedExpenses]
+  );
+
+  const budgetDelta = totalBudget ? totalBudget - totalSpent : null;
+
+  const monthlyIncome = useMemo(
+    () => toNumber(financialData?.monthly_income ?? financialData?.total_income ?? 0),
+    [financialData]
   );
 
   const topCategory = aggregatedExpenses[0];
@@ -99,7 +199,7 @@ const BudgetManagement: React.FC = () => {
     [aggregatedExpenses]
   );
 
-  if (isLoading && !financialData) {
+  if ((isLoading && !financialData) || isLoadingCategories) {
     return (
       <div className="flex h-full min-h-[50vh] w-full items-center justify-center">
         <div className="rounded-2xl border border-gray-700/40 bg-gradient-to-br from-gray-800/60 to-gray-900/60 px-6 py-4 text-gray-300 shadow-xl">
@@ -127,7 +227,7 @@ const BudgetManagement: React.FC = () => {
             Suivi budgétaire mensuel
           </h1>
           <p className="mt-1 text-sm text-gray-400">
-            Visualisez vos dépenses totales et identifiez la catégorie la plus consommatrice ce mois-ci.
+            Visualisez vos budgets catégoriels, les montants dépensés et les postes à surveiller.
           </p>
         </div>
         <button
@@ -144,13 +244,26 @@ const BudgetManagement: React.FC = () => {
         <div className="relative overflow-hidden rounded-2xl border border-blue-500/20 bg-gradient-to-br from-blue-500/20 to-blue-900/10 p-6 text-blue-100 shadow-xl">
           <WalletIcon className="mb-4 h-10 w-10 text-blue-200/80" />
           <p className="text-sm font-medium uppercase tracking-wide text-blue-200/70">
-            Budget mensuel disponible
+            Revenus mensuels
           </p>
           <p className="mt-2 text-2xl font-semibold">
-            {formatCurrency(financialData.monthly_income || financialData.total_income || 0)}
+            {formatCurrency(monthlyIncome)}
           </p>
           <span className="mt-3 inline-flex items-center gap-1 rounded-full bg-blue-500/20 px-3 py-1 text-xs text-blue-100/80">
-            Revenus déclarés
+            Basé sur votre profil
+          </span>
+        </div>
+
+        <div className="relative overflow-hidden rounded-2xl border border-indigo-500/20 bg-gradient-to-br from-indigo-500/20 to-indigo-900/10 p-6 text-indigo-100 shadow-xl">
+          <PiggyBankIcon className="mb-4 h-10 w-10 text-indigo-200/80" />
+          <p className="text-sm font-medium uppercase tracking-wide text-indigo-200/70">
+            Budgets définis
+          </p>
+          <p className="mt-2 text-2xl font-semibold">
+            {formatCurrency(totalBudget)}
+          </p>
+          <span className="mt-3 inline-flex items-center gap-1 rounded-full bg-indigo-500/20 px-3 py-1 text-xs text-indigo-100/80">
+            {aggregatedExpenses.filter((item) => item.monthlyBudget !== null).length} catégories budgétées
           </span>
         </div>
 
@@ -167,35 +280,57 @@ const BudgetManagement: React.FC = () => {
           </span>
         </div>
 
-        <div className="relative overflow-hidden rounded-2xl border border-cyan-500/20 bg-gradient-to-br from-cyan-500/20 to-cyan-900/10 p-6 text-cyan-100 shadow-xl">
-          <PiggyBankIcon className="mb-4 h-10 w-10 text-cyan-200/80" />
-          <p className="text-sm font-medium uppercase tracking-wide text-cyan-200/70">
-            Budget restant
+        <div className="relative overflow-hidden rounded-2xl border border-emerald-500/20 bg-gradient-to-br from-emerald-500/20 to-emerald-900/10 p-6 text-emerald-100 shadow-xl">
+          <PiggyBankIcon className="mb-4 h-10 w-10 text-emerald-200/80" />
+          <p className="text-sm font-medium uppercase tracking-wide text-emerald-200/70">
+            Écart budget / dépenses
           </p>
-          <p className="mt-2 text-2xl font-semibold">
-            {formatCurrency((financialData.monthly_income || financialData.total_income || 0) - totalSpent)}
+          <p className={`mt-2 text-2xl font-semibold ${budgetDelta !== null && budgetDelta < 0 ? 'text-rose-200' : ''}`}>
+            {budgetDelta !== null ? formatCurrency(budgetDelta) : '—'}
           </p>
-          <span className="mt-3 inline-flex items-center gap-1 rounded-full bg-cyan-500/20 px-3 py-1 text-xs text-cyan-100/80">
-            Objectif épargne: {formatCurrency((financialData.monthly_income || 0) * 0.2)}
+          <span className="mt-3 inline-flex items-center gap-1 rounded-full bg-emerald-500/20 px-3 py-1 text-xs text-emerald-100/80">
+            {budgetDelta !== null
+              ? budgetDelta >= 0
+                ? 'Sous le budget global'
+                : 'Au-dessus du budget global'
+              : 'Aucun budget total défini'}
           </span>
         </div>
-
-        {topCategory && (
-          <div className="relative overflow-hidden rounded-2xl border border-amber-500/20 bg-gradient-to-br from-amber-500/20 to-amber-900/10 p-6 text-amber-100 shadow-xl">
-            <CrownIcon className="mb-4 h-10 w-10 text-amber-200/80" />
-            <p className="text-sm font-medium uppercase tracking-wide text-amber-200/70">
-              Catégorie la plus dépensière
-            </p>
-            <p className="mt-2 text-2xl font-semibold">{topCategory.name}</p>
-            <span className="mt-3 inline-flex items-center gap-2 rounded-full bg-amber-500/20 px-3 py-1 text-xs text-amber-100/80">
-              {formatCurrency(topCategory.total)}
-              <span className="text-amber-100/60">
-                {topCategory.type === 'fixed' ? 'Dépense fixe' : 'Dépense variable'}
-              </span>
-            </span>
-          </div>
-        )}
       </div>
+
+      {topCategory && (
+        <div className="rounded-2xl border border-amber-500/20 bg-gradient-to-r from-amber-500/10 to-amber-500/5 p-5 text-amber-100">
+          <div className="flex items-center gap-4">
+            <div
+              className="flex h-12 w-12 items-center justify-center rounded-2xl text-2xl"
+              style={{ backgroundColor: `${topCategory.color || '#F59E0B'}20` }}
+            >
+              {topCategory.icon || '💡'}
+            </div>
+            <div className="flex-1">
+              <p className="text-xs uppercase tracking-wide text-amber-200/70">Catégorie la plus dépensière</p>
+              <h2 className="text-xl font-semibold text-amber-50">{topCategory.name}</h2>
+              <div className="mt-2 flex flex-wrap items-center gap-3 text-sm">
+                <span className="rounded-full bg-amber-500/20 px-3 py-1 text-amber-100">
+                  Dépenses: {formatCurrency(topCategory.total)}
+                </span>
+                {topCategory.monthlyBudget !== null && (
+                  <span className="rounded-full bg-amber-500/10 px-3 py-1 text-amber-100/80">
+                    Budget: {formatCurrency(topCategory.monthlyBudget)}
+                  </span>
+                )}
+                {topCategory.monthlyBudget !== null && (
+                  <span className={`rounded-full px-3 py-1 text-xs ${topCategory.total <= topCategory.monthlyBudget ? 'bg-emerald-500/20 text-emerald-100' : 'bg-rose-500/20 text-rose-100'}`}>
+                    {topCategory.total <= topCategory.monthlyBudget
+                      ? 'Dans le budget'
+                      : `Dépassé de ${formatCurrency(topCategory.total - topCategory.monthlyBudget)}`}
+                  </span>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
         <div className="overflow-hidden rounded-2xl border border-gray-700/40 bg-gradient-to-br from-gray-800/70 to-gray-900/70 p-6 shadow-xl">
@@ -242,33 +377,33 @@ const BudgetManagement: React.FC = () => {
               <div>
                 <p className="text-xs uppercase tracking-wide text-slate-300/80">Taux d’utilisation</p>
                 <p className="mt-1 text-lg font-semibold text-white">
-                  {((totalSpent / (financialData.monthly_income || financialData.total_income || 1)) * 100).toFixed(0)}%
+                  {((totalSpent / (totalBudget || monthlyIncome || 1)) * 100).toFixed(0)}%
                 </p>
               </div>
               <span className="rounded-full bg-slate-800/70 px-3 py-1 text-xs text-slate-200">
-                {formatCurrency(totalSpent)} / {formatCurrency(financialData.monthly_income || financialData.total_income || 0)}
+                {formatCurrency(totalSpent)} / {formatCurrency(totalBudget || monthlyIncome || 0)}
               </span>
             </div>
             <div className="flex items-center justify-between rounded-xl border border-white/5 bg-white/5 p-4">
               <div>
-                <p className="text-xs uppercase tracking-wide text-slate-300/80">Dépenses fixes</p>
+                <p className="text-xs uppercase tracking-wide text-slate-300/80">Budgets respectés</p>
                 <p className="mt-1 text-lg font-semibold text-white">
-                  {formatCurrency(financialData.total_fixed_expenses || 0)}
+                  {aggregatedExpenses.filter((item) => item.monthlyBudget !== null && item.total <= (item.monthlyBudget || 0)).length} / {aggregatedExpenses.filter((item) => item.monthlyBudget !== null).length}
                 </p>
               </div>
-              <span className="rounded-full bg-indigo-500/20 px-3 py-1 text-xs text-indigo-100">
-                {financialData.fixed_expenses.length || 0} postes
+              <span className="rounded-full bg-emerald-500/20 px-3 py-1 text-xs text-emerald-100">
+                {formatCurrency(Math.max(totalBudget - totalSpent, 0))} restant
               </span>
             </div>
             <div className="flex items-center justify-between rounded-xl border border-white/5 bg-white/5 p-4">
               <div>
-                <p className="text-xs uppercase tracking-wide text-slate-300/80">Dépenses variables</p>
+                <p className="text-xs uppercase tracking-wide text-slate-300/80">Catégories en dépassement</p>
                 <p className="mt-1 text-lg font-semibold text-white">
-                  {formatCurrency(financialData.total_variable_expenses || 0)}
+                  {aggregatedExpenses.filter((item) => item.monthlyBudget !== null && item.total > (item.monthlyBudget || 0)).length}
                 </p>
               </div>
-              <span className="rounded-full bg-pink-500/20 px-3 py-1 text-xs text-pink-100">
-                {financialData.variable_expenses.length || 0} postes
+              <span className="rounded-full bg-rose-500/20 px-3 py-1 text-xs text-rose-100">
+                {formatCurrency(Math.max(totalSpent - totalBudget, 0))} au-delà
               </span>
             </div>
           </div>
@@ -278,8 +413,8 @@ const BudgetManagement: React.FC = () => {
       <div className="overflow-hidden rounded-2xl border border-gray-700/40 bg-gradient-to-br from-gray-800/70 to-gray-900/70 p-6 shadow-xl">
         <div className="flex items-center justify-between">
           <div>
-            <h2 className="text-lg font-semibold text-white">Détails des dépenses</h2>
-            <p className="text-sm text-gray-400">Liste des catégories suivies ce mois-ci.</p>
+            <h2 className="text-lg font-semibold text-white">Catégories de dépenses</h2>
+            <p className="text-sm text-gray-400">Budgets mensuels vs dépenses réelles.</p>
           </div>
           <span className="hidden rounded-xl border border-blue-500/30 bg-blue-500/10 px-3 py-1 text-xs font-medium text-blue-100 sm:inline-flex">
             {aggregatedExpenses.length} catégories
@@ -288,33 +423,76 @@ const BudgetManagement: React.FC = () => {
         <div className="mt-6 grid grid-cols-1 gap-3 lg:grid-cols-2">
           {aggregatedExpenses.length === 0 && (
             <div className="rounded-xl border border-dashed border-gray-600/60 bg-gray-800/30 p-8 text-center text-sm text-gray-400">
-              Ajoutez vos dépenses fixes et variables pour suivre leur évolution ici.
+              Ajoutez vos dépenses ou définissez des budgets dans "Catégories" pour alimenter ce tableau.
             </div>
           )}
-          {aggregatedExpenses.map((item) => (
-            <div
-              key={item.name}
-              className="flex flex-col gap-4 rounded-xl border border-white/5 bg-white/5 p-5 text-slate-100 backdrop-blur-lg"
-            >
-              <div className="flex items-center justify-between">
-                <div>
-                  <h3 className="text-base font-semibold text-white">{item.name}</h3>
-                  <span className={`mt-1 inline-flex items-center rounded-full px-2.5 py-0.5 text-xs ${
-                    item.type === 'fixed' ? 'bg-indigo-500/20 text-indigo-200' : 'bg-pink-500/20 text-pink-200'
-                  }`}>
-                    {item.type === 'fixed' ? 'Dépense fixe' : 'Dépense variable'} • {item.frequency === 'monthly' ? 'Mensuel' : item.frequency === 'weekly' ? 'Hebdomadaire' : 'Occasionnel'}
-                  </span>
+          {aggregatedExpenses.map((item) => {
+            const usage = item.monthlyBudget ? Math.min(100, Math.round((item.total / item.monthlyBudget) * 100)) : null;
+            const delta = item.monthlyBudget !== null ? item.monthlyBudget - item.total : null;
+            return (
+              <div
+                key={item.id}
+                className="flex flex-col gap-4 rounded-xl border border-white/5 bg-white/5 p-5 text-slate-100 backdrop-blur-lg"
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div
+                      className="flex h-10 w-10 items-center justify-center rounded-xl text-xl"
+                      style={{ backgroundColor: `${item.color || '#6366F1'}20`, color: item.color || '#6366F1' }}
+                    >
+                      {item.icon || '💳'}
+                    </div>
+                    <div>
+                      <h3 className="text-base font-semibold text-white">{item.name}</h3>
+                      <span className={`mt-1 inline-flex items-center rounded-full px-2.5 py-0.5 text-xs ${
+                        item.type === 'fixed' ? 'bg-indigo-500/20 text-indigo-200' : 'bg-pink-500/20 text-pink-200'
+                      }`}>
+                        {item.type === 'fixed' ? 'Dépense fixe' : 'Dépense variable'}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="text-right text-sm">
+                    <p className="font-semibold text-white">{formatCurrency(item.total)}</p>
+                    {item.monthlyBudget !== null && (
+                      <p className="text-xs text-slate-300">Budget {formatCurrency(item.monthlyBudget)}</p>
+                    )}
+                    {delta !== null && (
+                      <p className={`text-xs ${delta >= 0 ? 'text-emerald-300' : 'text-rose-300'}`}>
+                        {delta >= 0 ? `Reste ${formatCurrency(delta)}` : `Dépassé de ${formatCurrency(Math.abs(delta))}`}
+                      </p>
+                    )}
+                  </div>
                 </div>
-                <div className="text-right text-sm">
-                  <p className="font-semibold text-white">{formatCurrency(item.total)}</p>
-                  <button className="mt-1 inline-flex items-center text-slate-300 transition hover:text-white">
+                <div>
+                  <div className="mb-2 flex items-center justify-between text-xs text-slate-400">
+                    <span>Utilisation</span>
+                    <span>{usage !== null ? `${usage}%` : '—'}</span>
+                  </div>
+                  <div className="h-2 w-full rounded-full bg-slate-700/60">
+                    <div
+                      className={`h-full rounded-full ${
+                        usage !== null
+                          ? usage >= 100
+                            ? 'bg-rose-500'
+                            : usage >= 85
+                            ? 'bg-amber-400'
+                            : 'bg-emerald-400'
+                          : 'bg-slate-500'
+                      }`}
+                      style={{ width: `${usage !== null ? usage : 0}%` }}
+                    />
+                  </div>
+                </div>
+                <div className="flex items-center justify-between text-xs text-slate-300">
+                  <span>{item.frequency === 'monthly' ? 'Mensuel' : item.frequency === 'weekly' ? 'Hebdomadaire' : 'Occasionnel'}</span>
+                  <button className="inline-flex items-center text-slate-300 transition hover:text-white">
                     Voir les transactions
                     <ArrowRightIcon size={14} className="ml-1" />
                   </button>
                 </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </div>
     </div>

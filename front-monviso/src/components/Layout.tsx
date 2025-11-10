@@ -1,15 +1,39 @@
 import React, { useEffect, useState } from 'react';
 import  '../assets/styles/logo.css';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { HomeIcon, CreditCardIcon, PieChartIcon, TagIcon, HistoryIcon, UserIcon, SettingsIcon, MenuIcon, XIcon, LogOutIcon, ChevronRightIcon, BellIcon, SearchIcon, TrendingUpIcon } from 'lucide-react';
+import {
+  HomeIcon,
+  CreditCardIcon,
+  PieChartIcon,
+  TagIcon,
+  HistoryIcon,
+  UserIcon,
+  SettingsIcon,
+  MenuIcon,
+  XIcon,
+  LogOutIcon,
+  ChevronRightIcon,
+  BellIcon,
+  SearchIcon,
+  TrendingUpIcon,
+  PlusIcon
+} from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 
 interface LayoutProps {
   children: React.ReactNode;
 }
+
+interface NavigationItem {
+  name: string;
+  shortLabel: string;
+  icon: typeof HomeIcon;
+  path: string;
+  color: string;
+  textColor: string;
+}
 //les liens des images doivent être en relatif pour fonctionner dans le build final
 const MonViso = '/images/logos/monviso.svg';
-
 
 const Layout: React.FC<LayoutProps> = ({
   children
@@ -37,45 +61,52 @@ const Layout: React.FC<LayoutProps> = ({
     window.addEventListener('scroll', handleScroll);
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
-  const navigationItems = [{
+  const navigationItems: NavigationItem[] = [{
     name: 'Tableau de bord',
-    icon: <HomeIcon size={20} />,
+    shortLabel: 'Accueil',
+    icon: HomeIcon,
     path: '/',
     color: 'from-blue-400 to-blue-600',
     textColor: 'text-blue-400'
   }, {
     name: 'Transactions',
-    icon: <CreditCardIcon size={20} />,
+    shortLabel: 'Transactions',
+    icon: CreditCardIcon,
     path: '/transactions',
     color: 'from-green-400 to-green-600',
     textColor: 'text-green-400'
   }, {
     name: 'Budget',
-    icon: <PieChartIcon size={20} />,
+    shortLabel: 'Budget',
+    icon: PieChartIcon,
     path: '/budget',
     color: 'from-purple-400 to-purple-600',
     textColor: 'text-purple-400'
   }, {
     name: 'Catégories',
-    icon: <TagIcon size={20} />,
+    shortLabel: 'Catégories',
+    icon: TagIcon,
     path: '/categories',
     color: 'from-amber-400 to-amber-600',
     textColor: 'text-amber-400'
   }, {
     name: 'Historique',
-    icon: <HistoryIcon size={20} />,
+    shortLabel: 'Historique',
+    icon: HistoryIcon,
     path: '/history',
     color: 'from-cyan-400 to-cyan-600',
     textColor: 'text-cyan-400'
   }, {
     name: 'Préréglages',
-    icon: <SettingsIcon size={20} />,
+    shortLabel: 'Préréglages',
+    icon: SettingsIcon,
     path: '/presets',
     color: 'from-rose-400 to-rose-600',
     textColor: 'text-rose-400'
   }, {
     name: 'Profil',
-    icon: <UserIcon size={20} />,
+    shortLabel: 'Profil',
+    icon: UserIcon,
     path: '/profile',
     color: 'from-indigo-400 to-indigo-600',
     textColor: 'text-indigo-400'
@@ -122,7 +153,7 @@ const Layout: React.FC<LayoutProps> = ({
                   <div className="relative mr-3 flex-shrink-0">
                     <div className={`absolute inset-0 rounded-full blur-md transition-opacity duration-300 ${isActive || isHovered ? 'opacity-20' : 'opacity-0'} bg-gradient-to-r ${item.color}`}></div>
                     <span className={`relative z-10 ${isActive ? item.textColor : 'text-gray-400 group-hover:' + item.textColor}`}>
-                      {item.icon}
+                      <item.icon size={20} />
                     </span>
                   </div>
                   {/* Text */}
@@ -188,7 +219,7 @@ const Layout: React.FC<LayoutProps> = ({
       {/* Main content */}
       <div className="flex flex-1 flex-col overflow-hidden">
         {/* Top header */}
-        <header className={`bg-gray-900/50 backdrop-blur-md border-b border-gray-800/50 shadow-lg transition-all duration-300 ${scrolled ? 'shadow-black/20' : 'shadow-black/10'} z-10`}>
+        <header className={`bg-gray-900/50 backdrop-blur-md border-b border-gray-800/50 shadow-lg transition-all duration-300 ${scrolled ? 'shadow-black/20' : 'shadow-black/10'} z-40`}>
           <div className="flex h-16 items-center justify-between px-4 sm:px-6">
             <div className="flex items-center">
               <button onClick={toggleSidebar} className="text-gray-400 hover:text-white focus:outline-none focus:ring-2 focus:ring-inset focus:ring-blue-500 lg:hidden">
@@ -229,10 +260,39 @@ const Layout: React.FC<LayoutProps> = ({
         </header>
 
         {/* Main content area */}
-        <main className="flex-1 overflow-auto bg-gradient-to-br from-gray-900 to-blue-900 p-4 sm:p-6">
+        <main className="flex-1 overflow-auto bg-gradient-to-br from-gray-900 to-blue-900 p-4 pb-24 sm:p-6 sm:pb-6">
           {children}
         </main>
       </div>
+
+      <nav className="fixed inset-x-0 bottom-4 z-20 flex justify-center sm:hidden">
+        <div className="mx-auto flex items-center justify-center gap-8 rounded-full border border-white/10 bg-white/5 backdrop-blur-2xl px-4 py-2 shadow-lg">
+          <Link
+            to="/"
+            className={`flex items-center justify-center rounded-full p-2.5 transition ${
+              activeTab === '/' ? 'bg-white/10 text-gray-200' : 'text-gray-400 hover:text-gray-300'
+            }`}
+          >
+            <HomeIcon size={20} strokeWidth={1.5} />
+          </Link>
+
+          <button
+            onClick={() => navigate('/transactions?new=1')}
+            className="flex items-center justify-center rounded-full bg-white p-4 text-gray-900 shadow-2xl transition hover:scale-105"
+          >
+            <PlusIcon size={24} strokeWidth={2.5} />
+          </button>
+
+          <Link
+            to="/profile"
+            className={`flex items-center justify-center rounded-full p-2.5 transition ${
+              activeTab === '/profile' ? 'bg-white/10 text-gray-200' : 'text-gray-400 hover:text-gray-300'
+            }`}
+          >
+            <UserIcon size={20} strokeWidth={1.5} />
+          </Link>
+        </div>
+      </nav>
     </div>;
 };
 export default Layout;
