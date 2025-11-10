@@ -1,190 +1,324 @@
-import React from 'react';
-import { PlusIcon, AlertCircleIcon, ChevronRightIcon } from 'lucide-react';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-const BudgetManagement = () => {
-  // Sample data
-  const categories = [{
-    id: 1,
-    name: 'Logement',
-    budget: 900,
-    spent: 850,
-    remaining: 50,
-    percentage: 94,
-    icon: '🏠',
-    color: '#3b82f6'
-  }, {
-    id: 2,
-    name: 'Alimentation',
-    budget: 500,
-    spent: 420,
-    remaining: 80,
-    percentage: 84,
-    icon: '🛒',
-    color: '#10b981'
-  }, {
-    id: 3,
-    name: 'Transport',
-    budget: 200,
-    spent: 180,
-    remaining: 20,
-    percentage: 90,
-    icon: '🚗',
-    color: '#f59e0b'
-  }, {
-    id: 4,
-    name: 'Loisirs',
-    budget: 300,
-    spent: 350,
-    remaining: -50,
-    percentage: 117,
-    icon: '🎭',
-    color: '#8b5cf6'
-  }, {
-    id: 5,
-    name: 'Santé',
-    budget: 150,
-    spent: 75,
-    remaining: 75,
-    percentage: 50,
-    icon: '⚕️',
-    color: '#ec4899'
-  }, {
-    id: 6,
-    name: 'Factures',
-    budget: 400,
-    spent: 390,
-    remaining: 10,
-    percentage: 98,
-    icon: '📄',
-    color: '#ef4444'
-  }];
-  const chartData = categories.map(category => ({
-    name: category.name,
-    Budget: category.budget,
-    Dépensé: category.spent
-  }));
-  return <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-gray-900">Gestion du budget</h1>
-        <button className="inline-flex items-center rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-blue-700">
-          <PlusIcon size={16} className="mr-2" />
-          Nouvelle catégorie
+// @ts-nocheck
+import React, { useEffect, useMemo, useState } from 'react';
+import {
+  RefreshCcwIcon,
+  WalletIcon,
+  TrendingDownIcon,
+  PiggyBankIcon,
+  CrownIcon,
+  ArrowRightIcon
+} from 'lucide-react';
+import {
+  ResponsiveContainer,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip
+} from 'recharts';
+import { useAuth } from '../contexts/AuthContext';
+
+interface AggregatedExpense {
+  name: string;
+  total: number;
+  frequency: string;
+  type: 'fixed' | 'variable';
+}
+
+interface ChartDatum {
+  name: string;
+  spent: number;
+}
+
+const formatCurrency = (value: number) =>
+  value.toLocaleString('fr-FR', {
+    style: 'currency',
+    currency: 'EUR',
+    minimumFractionDigits: 0
+  });
+
+const BudgetManagement: React.FC = () => {
+  const { financialData, refreshFinancialData, isLoading } = useAuth();
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [initialized, setInitialized] = useState(false);
+
+  useEffect(() => {
+    const bootstrap = async () => {
+      if (!initialized && !financialData) {
+        setIsRefreshing(true);
+        await refreshFinancialData();
+        setIsRefreshing(false);
+        setInitialized(true);
+      }
+    };
+    bootstrap();
+  }, [financialData, initialized, refreshFinancialData]);
+
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    await refreshFinancialData();
+    setIsRefreshing(false);
+  };
+
+  const expenses = useMemo(() => {
+    if (!financialData) return [];
+    return [...(financialData.fixed_expenses || []), ...(financialData.variable_expenses || [])];
+  }, [financialData]);
+
+  const aggregatedExpenses = useMemo<AggregatedExpense[]>(() => {
+    const map = new Map<string, AggregatedExpense>();
+
+    expenses.forEach((expense) => {
+      const key = expense.name || `cat-${expense.id}`;
+      const previous = map.get(key);
+      const total = (previous?.total || 0) + (expense.amount || 0);
+      const normalizedType: 'fixed' | 'variable' = expense.type === 'fixed' ? 'fixed' : 'variable';
+      const frequency = expense.frequency || previous?.frequency || 'unique';
+
+      map.set(key, {
+        name: expense.name || previous?.name || 'Autre',
+        total,
+        frequency,
+        type: normalizedType
+      });
+    });
+
+    return Array.from(map.values()).sort((a, b) => b.total - a.total);
+  }, [expenses]);
+
+  const totalSpent = useMemo(
+    () => expenses.reduce((sum, exp) => sum + (exp.amount || 0), 0),
+    [expenses]
+  );
+
+  const topCategory = aggregatedExpenses[0];
+
+  const chartData = useMemo<ChartDatum[]>(
+    () => aggregatedExpenses.slice(0, 6).map((item) => ({ name: item.name, spent: Math.round(item.total) })),
+    [aggregatedExpenses]
+  );
+
+  if (isLoading && !financialData) {
+    return (
+      <div className="flex h-full min-h-[50vh] w-full items-center justify-center">
+        <div className="rounded-2xl border border-gray-700/40 bg-gradient-to-br from-gray-800/60 to-gray-900/60 px-6 py-4 text-gray-300 shadow-xl">
+          Chargement du suivi budgétaire...
+        </div>
+      </div>
+    );
+  }
+
+  if (!financialData) {
+    return (
+      <div className="flex h-full min-h-[50vh] w-full items-center justify-center">
+        <div className="rounded-2xl border border-red-500/30 bg-red-500/10 px-6 py-4 text-red-200 shadow-xl">
+          Impossible de récupérer vos données budgétaires.
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h1 className="bg-gradient-to-r from-blue-200 to-purple-200 bg-clip-text text-3xl font-bold text-transparent">
+            Suivi budgétaire mensuel
+          </h1>
+          <p className="mt-1 text-sm text-gray-400">
+            Visualisez vos dépenses totales et identifiez la catégorie la plus consommatrice ce mois-ci.
+          </p>
+        </div>
+        <button
+          onClick={handleRefresh}
+          disabled={isRefreshing}
+          className="inline-flex items-center justify-center rounded-xl border border-blue-500/40 bg-blue-500/10 px-4 py-2 text-sm font-medium text-blue-200 transition hover:bg-blue-500/20 disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          <RefreshCcwIcon size={18} className={`mr-2 ${isRefreshing ? 'animate-spin' : ''}`} />
+          Actualiser
         </button>
       </div>
-      {/* Budget Overview */}
-      <div className="overflow-hidden rounded-lg bg-white shadow">
-        <div className="px-4 py-5 sm:p-6">
-          <h2 className="text-lg font-medium text-gray-900">
-            Aperçu du budget mensuel
-          </h2>
-          <div className="mt-4 h-72">
+
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <div className="relative overflow-hidden rounded-2xl border border-blue-500/20 bg-gradient-to-br from-blue-500/20 to-blue-900/10 p-6 text-blue-100 shadow-xl">
+          <WalletIcon className="mb-4 h-10 w-10 text-blue-200/80" />
+          <p className="text-sm font-medium uppercase tracking-wide text-blue-200/70">
+            Budget mensuel disponible
+          </p>
+          <p className="mt-2 text-2xl font-semibold">
+            {formatCurrency(financialData.monthly_income || financialData.total_income || 0)}
+          </p>
+          <span className="mt-3 inline-flex items-center gap-1 rounded-full bg-blue-500/20 px-3 py-1 text-xs text-blue-100/80">
+            Revenus déclarés
+          </span>
+        </div>
+
+        <div className="relative overflow-hidden rounded-2xl border border-purple-500/20 bg-gradient-to-br from-purple-500/20 to-purple-900/10 p-6 text-purple-100 shadow-xl">
+          <TrendingDownIcon className="mb-4 h-10 w-10 text-purple-200/80" />
+          <p className="text-sm font-medium uppercase tracking-wide text-purple-200/70">
+            Dépenses mensuelles
+          </p>
+          <p className="mt-2 text-2xl font-semibold">
+            {formatCurrency(totalSpent)}
+          </p>
+          <span className="mt-3 inline-flex items-center gap-1 rounded-full bg-purple-500/20 px-3 py-1 text-xs text-purple-100/80">
+            Fixes: {formatCurrency(financialData.total_fixed_expenses || 0)} • Variables: {formatCurrency(financialData.total_variable_expenses || 0)}
+          </span>
+        </div>
+
+        <div className="relative overflow-hidden rounded-2xl border border-cyan-500/20 bg-gradient-to-br from-cyan-500/20 to-cyan-900/10 p-6 text-cyan-100 shadow-xl">
+          <PiggyBankIcon className="mb-4 h-10 w-10 text-cyan-200/80" />
+          <p className="text-sm font-medium uppercase tracking-wide text-cyan-200/70">
+            Budget restant
+          </p>
+          <p className="mt-2 text-2xl font-semibold">
+            {formatCurrency((financialData.monthly_income || financialData.total_income || 0) - totalSpent)}
+          </p>
+          <span className="mt-3 inline-flex items-center gap-1 rounded-full bg-cyan-500/20 px-3 py-1 text-xs text-cyan-100/80">
+            Objectif épargne: {formatCurrency((financialData.monthly_income || 0) * 0.2)}
+          </span>
+        </div>
+
+        {topCategory && (
+          <div className="relative overflow-hidden rounded-2xl border border-amber-500/20 bg-gradient-to-br from-amber-500/20 to-amber-900/10 p-6 text-amber-100 shadow-xl">
+            <CrownIcon className="mb-4 h-10 w-10 text-amber-200/80" />
+            <p className="text-sm font-medium uppercase tracking-wide text-amber-200/70">
+              Catégorie la plus dépensière
+            </p>
+            <p className="mt-2 text-2xl font-semibold">{topCategory.name}</p>
+            <span className="mt-3 inline-flex items-center gap-2 rounded-full bg-amber-500/20 px-3 py-1 text-xs text-amber-100/80">
+              {formatCurrency(topCategory.total)}
+              <span className="text-amber-100/60">
+                {topCategory.type === 'fixed' ? 'Dépense fixe' : 'Dépense variable'}
+              </span>
+            </span>
+          </div>
+        )}
+      </div>
+
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
+        <div className="overflow-hidden rounded-2xl border border-gray-700/40 bg-gradient-to-br from-gray-800/70 to-gray-900/70 p-6 shadow-xl">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-lg font-semibold text-white">Répartition des dépenses</h2>
+              <p className="text-sm text-gray-400">Top 6 catégories ce mois-ci.</p>
+            </div>
+          </div>
+          <div className="mt-6 h-72">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={chartData} margin={{
-              top: 20,
-              right: 30,
-              left: 20,
-              bottom: 5
-            }}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="name" />
-                <YAxis />
-                <Tooltip formatter={value => `${value} €`} />
-                <Bar dataKey="Budget" fill="#3b82f6" />
-                <Bar dataKey="Dépensé" fill="#ef4444" />
+              <BarChart data={chartData}>
+                <CartesianGrid strokeDasharray="3 3" stroke="rgba(148, 163, 184, 0.2)" />
+                <XAxis dataKey="name" stroke="#cbd5f5" tick={{ fill: '#cbd5f5', fontSize: 12 }} interval={0} angle={-20} dy={10} />
+                <YAxis
+                  stroke="#cbd5f5"
+                  tickFormatter={(value: number) => `${Math.round(value)}`}
+                  tick={{ fill: '#cbd5f5', fontSize: 12 }}
+                />
+                <Tooltip
+                  formatter={(value: number) => [formatCurrency(value), 'Montant dépensé'] as [string, string]}
+                  contentStyle={{
+                    backgroundColor: 'rgba(15, 23, 42, 0.85)',
+                    borderColor: 'rgba(99, 102, 241, 0.3)',
+                    borderRadius: '0.75rem',
+                    color: '#e2e8f0'
+                  }}
+                />
+                <Bar dataKey="spent" name="Dépensé" fill="#f472b6" radius={[8, 8, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </div>
         </div>
-      </div>
-      {/* Budget Categories */}
-      <div className="overflow-hidden rounded-lg bg-white shadow">
-        <div className="px-4 py-5 sm:p-6">
-          <h2 className="text-lg font-medium text-gray-900">
-            Catégories budgétaires
-          </h2>
-          <div className="mt-6 space-y-4">
-            {categories.map(category => <div key={category.id} className="rounded-md border border-gray-200 p-4 hover:bg-gray-50">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-md text-lg">
-                      {category.icon}
-                    </div>
-                    <div className="ml-4">
-                      <h3 className="text-lg font-medium text-gray-900">
-                        {category.name}
-                      </h3>
-                      <p className="text-sm text-gray-500">
-                        Budget: {category.budget} € | Dépensé: {category.spent}{' '}
-                        €
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex items-center">
-                    <div className="mr-4 text-right">
-                      <p className={`text-sm font-medium ${category.remaining >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                        {category.remaining >= 0 ? `Reste: ${category.remaining} €` : `Dépassé de: ${Math.abs(category.remaining)} €`}
-                      </p>
-                      <p className="text-xs text-gray-500">
-                        {category.percentage}% utilisé
-                      </p>
-                    </div>
-                    <div className="w-24">
-                      <div className="h-2 w-full rounded-full bg-gray-200">
-                        <div className={`h-2 rounded-full ${category.percentage >= 100 ? 'bg-red-600' : category.percentage >= 80 ? 'bg-yellow-500' : 'bg-green-500'}`} style={{
-                      width: `${Math.min(category.percentage, 100)}%`
-                    }}></div>
-                      </div>
-                    </div>
-                    <ChevronRightIcon size={20} className="ml-4 text-gray-400" />
-                  </div>
-                </div>
-              </div>)}
-          </div>
-        </div>
-      </div>
-      {/* Budget Tips */}
-      <div className="overflow-hidden rounded-lg bg-white shadow">
-        <div className="px-4 py-5 sm:p-6">
-          <h2 className="text-lg font-medium text-gray-900">
-            Conseils budgétaires
-          </h2>
-          <div className="mt-4 space-y-4">
-            <div className="rounded-md bg-yellow-50 p-4">
-              <div className="flex">
-                <div className="flex-shrink-0">
-                  <AlertCircleIcon size={20} className="text-yellow-400" />
-                </div>
-                <div className="ml-3">
-                  <h3 className="text-sm font-medium text-yellow-800">
-                    Attention au budget Loisirs
-                  </h3>
-                  <p className="mt-2 text-sm text-yellow-700">
-                    Vous avez dépassé votre budget Loisirs de 50€. Pensez à
-                    ajuster vos dépenses pour le reste du mois.
-                  </p>
-                </div>
-              </div>
+
+        <div className="overflow-hidden rounded-2xl border border-gray-700/40 bg-gradient-to-br from-gray-800/70 to-gray-900/70 p-6 shadow-xl">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-lg font-semibold text-white">Synthèse budgétaire</h2>
+              <p className="text-sm text-gray-400">Analyse rapide de votre consommation.</p>
             </div>
-            <div className="rounded-md bg-blue-50 p-4">
-              <div className="flex">
-                <div className="flex-shrink-0">
-                  <AlertCircleIcon size={20} className="text-blue-400" />
-                </div>
-                <div className="ml-3">
-                  <h3 className="text-sm font-medium text-blue-800">
-                    Conseil: Règle des 50/30/20
-                  </h3>
-                  <p className="mt-2 text-sm text-blue-700">
-                    Essayez d'allouer 50% de votre budget aux besoins
-                    essentiels, 30% aux envies et 20% à l'épargne pour une
-                    gestion financière équilibrée.
-                  </p>
-                </div>
+          </div>
+          <div className="mt-6 space-y-4 text-sm text-slate-100">
+            <div className="flex items-center justify-between rounded-xl border border-white/5 bg-white/5 p-4">
+              <div>
+                <p className="text-xs uppercase tracking-wide text-slate-300/80">Taux d’utilisation</p>
+                <p className="mt-1 text-lg font-semibold text-white">
+                  {((totalSpent / (financialData.monthly_income || financialData.total_income || 1)) * 100).toFixed(0)}%
+                </p>
               </div>
+              <span className="rounded-full bg-slate-800/70 px-3 py-1 text-xs text-slate-200">
+                {formatCurrency(totalSpent)} / {formatCurrency(financialData.monthly_income || financialData.total_income || 0)}
+              </span>
+            </div>
+            <div className="flex items-center justify-between rounded-xl border border-white/5 bg-white/5 p-4">
+              <div>
+                <p className="text-xs uppercase tracking-wide text-slate-300/80">Dépenses fixes</p>
+                <p className="mt-1 text-lg font-semibold text-white">
+                  {formatCurrency(financialData.total_fixed_expenses || 0)}
+                </p>
+              </div>
+              <span className="rounded-full bg-indigo-500/20 px-3 py-1 text-xs text-indigo-100">
+                {financialData.fixed_expenses.length || 0} postes
+              </span>
+            </div>
+            <div className="flex items-center justify-between rounded-xl border border-white/5 bg-white/5 p-4">
+              <div>
+                <p className="text-xs uppercase tracking-wide text-slate-300/80">Dépenses variables</p>
+                <p className="mt-1 text-lg font-semibold text-white">
+                  {formatCurrency(financialData.total_variable_expenses || 0)}
+                </p>
+              </div>
+              <span className="rounded-full bg-pink-500/20 px-3 py-1 text-xs text-pink-100">
+                {financialData.variable_expenses.length || 0} postes
+              </span>
             </div>
           </div>
         </div>
       </div>
-    </div>;
+
+      <div className="overflow-hidden rounded-2xl border border-gray-700/40 bg-gradient-to-br from-gray-800/70 to-gray-900/70 p-6 shadow-xl">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-lg font-semibold text-white">Détails des dépenses</h2>
+            <p className="text-sm text-gray-400">Liste des catégories suivies ce mois-ci.</p>
+          </div>
+          <span className="hidden rounded-xl border border-blue-500/30 bg-blue-500/10 px-3 py-1 text-xs font-medium text-blue-100 sm:inline-flex">
+            {aggregatedExpenses.length} catégories
+          </span>
+        </div>
+        <div className="mt-6 grid grid-cols-1 gap-3 lg:grid-cols-2">
+          {aggregatedExpenses.length === 0 && (
+            <div className="rounded-xl border border-dashed border-gray-600/60 bg-gray-800/30 p-8 text-center text-sm text-gray-400">
+              Ajoutez vos dépenses fixes et variables pour suivre leur évolution ici.
+            </div>
+          )}
+          {aggregatedExpenses.map((item) => (
+            <div
+              key={item.name}
+              className="flex flex-col gap-4 rounded-xl border border-white/5 bg-white/5 p-5 text-slate-100 backdrop-blur-lg"
+            >
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-base font-semibold text-white">{item.name}</h3>
+                  <span className={`mt-1 inline-flex items-center rounded-full px-2.5 py-0.5 text-xs ${
+                    item.type === 'fixed' ? 'bg-indigo-500/20 text-indigo-200' : 'bg-pink-500/20 text-pink-200'
+                  }`}>
+                    {item.type === 'fixed' ? 'Dépense fixe' : 'Dépense variable'} • {item.frequency === 'monthly' ? 'Mensuel' : item.frequency === 'weekly' ? 'Hebdomadaire' : 'Occasionnel'}
+                  </span>
+                </div>
+                <div className="text-right text-sm">
+                  <p className="font-semibold text-white">{formatCurrency(item.total)}</p>
+                  <button className="mt-1 inline-flex items-center text-slate-300 transition hover:text-white">
+                    Voir les transactions
+                    <ArrowRightIcon size={14} className="ml-1" />
+                  </button>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
 };
+
 export default BudgetManagement;

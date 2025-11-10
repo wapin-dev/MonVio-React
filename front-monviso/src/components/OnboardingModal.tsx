@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, ChevronLeft, ChevronRight } from 'lucide-react';
+import { X, ChevronLeft, ChevronRight, CheckCircle, Circle, ArrowRight, ArrowLeft } from 'lucide-react';
 import { PersonalInfoStep, PrimaryIncomeStep, AdditionalIncomeStep, FixedExpensesStep, VariableExpensesStep, GoalsAndSummaryStep } from './OnboardingSteps';
 import { onboardingService } from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
@@ -7,7 +7,7 @@ import { useAuth } from '../contexts/AuthContext';
 interface OnboardingModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onComplete: () => void;
+  onComplete: () => Promise<void>;
 }
 
 export interface OnboardingData {
@@ -66,12 +66,48 @@ const OnboardingModal: React.FC<OnboardingModalProps> = ({ isOpen, onClose, onCo
   });
 
   const steps = [
-    { title: 'Informations personnelles', component: PersonalInfoStep },
-    { title: 'Revenu principal', component: PrimaryIncomeStep },
-    { title: 'Revenus additionnels', component: AdditionalIncomeStep },
-    { title: 'Dépenses fixes', component: FixedExpensesStep },
-    { title: 'Dépenses variables', component: VariableExpensesStep },
-    { title: 'Objectifs et résumé', component: GoalsAndSummaryStep }
+    { 
+      title: 'Informations personnelles', 
+      subtitle: 'Qui êtes-vous ?',
+      description: 'Commençons par vous connaître',
+      icon: '👤',
+      component: PersonalInfoStep 
+    },
+    { 
+      title: 'Revenu principal', 
+      subtitle: 'Votre salaire',
+      description: 'Votre source de revenus principale',
+      icon: '💰',
+      component: PrimaryIncomeStep 
+    },
+    { 
+      title: 'Revenus additionnels', 
+      subtitle: 'Autres revenus',
+      description: 'Freelance, investissements, etc.',
+      icon: '📈',
+      component: AdditionalIncomeStep 
+    },
+    { 
+      title: 'Dépenses fixes', 
+      subtitle: 'Charges obligatoires',
+      description: 'Loyer, assurances, abonnements',
+      icon: '🏠',
+      component: FixedExpensesStep 
+    },
+    { 
+      title: 'Dépenses variables', 
+      subtitle: 'Vie quotidienne',
+      description: 'Alimentation, loisirs, shopping',
+      icon: '🛒',
+      component: VariableExpensesStep 
+    },
+    { 
+      title: 'Objectifs et résumé', 
+      subtitle: 'Vos projets',
+      description: 'Épargne et objectifs financiers',
+      icon: '🎯',
+      component: GoalsAndSummaryStep 
+    }
   ];
 
   const updateData = (stepData: Partial<OnboardingData>) => {
@@ -128,7 +164,7 @@ const OnboardingModal: React.FC<OnboardingModalProps> = ({ isOpen, onClose, onCo
       console.log('[ONBOARDING] Cleaned data:', cleanedData);
       await onboardingService.submitOnboarding(cleanedData);
       console.log('[ONBOARDING] Onboarding completed successfully');
-      onComplete();
+      await onComplete();
     } catch (error) {
       console.error('[ONBOARDING] Error submitting onboarding data:', error);
       alert('Erreur lors de la sauvegarde. Veuillez réessayer.');
@@ -141,87 +177,145 @@ const OnboardingModal: React.FC<OnboardingModalProps> = ({ isOpen, onClose, onCo
 
   const CurrentStepComponent = steps[currentStep].component;
   const progress = ((currentStep + 1) / steps.length) * 100;
+  const currentStepData = steps[currentStep];
+  const isLastStep = currentStep === steps.length - 1;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] overflow-hidden">
-        {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b">
-          <div>
-            <h2 className="text-xl font-semibold text-gray-900">
-              Configuration de votre budget
-            </h2>
-            <p className="text-sm text-gray-600 mt-1">
-              Étape {currentStep + 1} sur {steps.length}: {steps[currentStep].title}
-            </p>
+    <div className="fixed inset-0 z-50">
+      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
+      <div className="relative z-10 flex min-h-screen w-full items-stretch justify-center sm:min-h-full sm:items-start sm:overflow-y-auto sm:p-6">
+        <div className="flex h-screen w-full min-h-0 flex-col bg-gradient-to-br from-white to-gray-50 sm:h-auto sm:max-h-[90vh] sm:w-auto sm:max-w-4xl sm:overflow-hidden sm:rounded-2xl sm:border sm:border-gray-200/50 sm:shadow-2xl">
+          {/* Header */}
+          <div className="relative bg-gradient-to-r from-blue-600 to-purple-600 px-4 py-5 text-white sm:px-6">
+            <div className="absolute inset-0 bg-black/10" />
+            <div className="relative z-10 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+              <div className="flex items-center gap-4">
+                <div className="text-3xl sm:text-4xl">{currentStepData.icon}</div>
+                <div className="space-y-1">
+                  <h2 className="text-xl font-bold sm:text-2xl">{currentStepData.title}</h2>
+                  <p className="text-sm text-blue-100 sm:text-base">
+                    {currentStepData.subtitle} • {currentStepData.description}
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center justify-between gap-3 sm:flex-col sm:items-end">
+                <span className="text-sm text-blue-100">Étape {currentStep + 1} sur {steps.length}</span>
+                <span className="text-lg font-semibold">{Math.round(progress)}%</span>
+              </div>
+            </div>
           </div>
-          <button
-            onClick={onClose}
-            className="text-gray-400 hover:text-gray-600 transition-colors"
-            disabled={isSubmitting}
-          >
-            <X size={24} />
-          </button>
-        </div>
 
-        {/* Progress bar */}
-        <div className="px-6 py-4 border-b">
-          <div className="w-full bg-gray-200 rounded-full h-2">
-            <div 
-              className="bg-blue-600 h-2 rounded-full transition-all duration-300"
-              style={{ width: `${progress}%` }}
-            />
-          </div>
-        </div>
-
-        {/* Content */}
-        <div className="p-6 overflow-y-auto max-h-[60vh]">
-          <CurrentStepComponent 
-            data={onboardingData}
-            updateData={updateData}
-          />
-        </div>
-
-        {/* Footer */}
-        <div className="flex items-center justify-between p-6 border-t bg-gray-50">
-          <button
-            onClick={handlePrevious}
-            disabled={currentStep === 0 || isSubmitting}
-            className="flex items-center px-4 py-2 text-gray-600 hover:text-gray-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-          >
-            <ChevronLeft size={20} className="mr-1" />
-            Précédent
-          </button>
-
-          <div className="flex space-x-2">
-            {steps.map((_, index) => (
+          {/* Progress */}
+          <div className="px-4 py-4 sm:px-6 sm:py-5 bg-gray-50/60">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex items-center gap-2 text-sm text-gray-600">
+                <span className="font-medium">Progression</span>
+                <span className="hidden text-gray-500 sm:block">{currentStep + 1}/{steps.length}</span>
+              </div>
+              <span className="text-sm text-gray-500 sm:hidden">{currentStep + 1}/{steps.length}</span>
+            </div>
+            <div className="mt-3 h-2 w-full overflow-hidden rounded-full bg-gray-200">
               <div
-                key={index}
-                className={`w-2 h-2 rounded-full transition-colors ${
-                  index <= currentStep ? 'bg-blue-600' : 'bg-gray-300'
-                }`}
+                className="h-full rounded-full bg-gradient-to-r from-blue-500 to-purple-500 transition-all duration-500 ease-out"
+                style={{ width: `${progress}%` }}
               />
-            ))}
+            </div>
+            <div className="mt-4 overflow-x-auto">
+              <div className="flex items-center gap-3 pb-1">
+                {steps.map((step, index) => {
+                  const isCompleted = index < currentStep;
+                  const isActive = index === currentStep;
+                  return (
+                    <div key={index} className="flex flex-col items-center">
+                      <div
+                        className={`flex h-9 w-9 items-center justify-center rounded-full text-xs font-semibold transition-all duration-300 sm:h-8 sm:w-8 ${
+                          isCompleted
+                            ? 'bg-green-500 text-white'
+                            : isActive
+                            ? 'bg-blue-500 text-white ring-4 ring-blue-200'
+                            : 'bg-gray-300 text-gray-600'
+                        }`}
+                      >
+                        {isCompleted ? <CheckCircle size={16} /> : index + 1}
+                      </div>
+                      <span
+                        className={`mt-1 max-w-[72px] text-center text-[11px] sm:text-xs ${
+                          index <= currentStep ? 'text-gray-700 font-medium' : 'text-gray-400'
+                        }`}
+                      >
+                        {step.title.split(' ')[0]}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
           </div>
 
-          {currentStep < steps.length - 1 ? (
-            <button
-              onClick={handleNext}
-              disabled={isSubmitting}
-              className="flex items-center px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-            >
-              Suivant
-              <ChevronRight size={20} className="ml-1" />
-            </button>
-          ) : (
-            <button
-              onClick={handleComplete}
-              disabled={isSubmitting}
-              className="flex items-center px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-            >
-              {isSubmitting ? 'Sauvegarde...' : 'Terminer'}
-            </button>
-          )}
+          {/* Content */}
+          <div className="flex-1 overflow-y-auto bg-white px-4 py-6 sm:p-8">
+            <div className="mx-auto w-full max-w-3xl">
+              <CurrentStepComponent data={onboardingData} updateData={updateData} />
+            </div>
+          </div>
+
+          {/* Footer */}
+          <div className="sticky bottom-0 bg-gradient-to-r from-gray-50 to-gray-100 px-4 py-4 shadow-inner sm:static sm:border-t sm:border-gray-200 sm:px-6 sm:py-5">
+            <div className="flex flex-col-reverse items-stretch gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <button
+                onClick={handlePrevious}
+                disabled={currentStep === 0 || isSubmitting}
+                className="flex items-center justify-center rounded-xl border border-gray-300 px-5 py-3 text-sm font-medium text-gray-600 transition-all duration-200 hover:border-gray-400 hover:bg-white hover:text-gray-800 hover:shadow-md disabled:cursor-not-allowed disabled:opacity-50 sm:px-6"
+              >
+                <ArrowLeft size={18} className="mr-2" />
+                Précédent
+              </button>
+
+              <div className="flex items-center justify-center gap-2 sm:hidden">
+                {steps.map((_, index) => (
+                  <span
+                    key={index}
+                    className={`h-2 w-2 rounded-full ${
+                      index < currentStep
+                        ? 'bg-green-500'
+                        : index === currentStep
+                        ? 'bg-blue-500'
+                        : 'bg-gray-300'
+                    }`}
+                  />
+                ))}
+              </div>
+
+              {isLastStep ? (
+                <button
+                  onClick={handleComplete}
+                  disabled={isSubmitting}
+                  className="flex items-center justify-center rounded-xl bg-gradient-to-r from-green-600 to-emerald-600 px-6 py-3 text-sm font-semibold text-white transition-all duration-200 hover:from-green-700 hover:to-emerald-700 hover:shadow-lg disabled:cursor-not-allowed disabled:opacity-50 sm:px-8"
+                >
+                  {isSubmitting ? (
+                    <>
+                      <div className="mr-2 h-5 w-5 animate-spin rounded-full border-b-2 border-white"></div>
+                      Sauvegarde...
+                    </>
+                  ) : (
+                    <>
+                      <CheckCircle size={18} className="mr-2" />
+                      Terminer la configuration
+                    </>
+                  )}
+                </button>
+              ) : (
+                <button
+                  onClick={handleNext}
+                  disabled={isSubmitting}
+                  className="flex items-center justify-center rounded-xl bg-gradient-to-r from-blue-600 to-purple-600 px-6 py-3 text-sm font-semibold text-white transition-all duration-200 hover:from-blue-700 hover:to-purple-700 hover:shadow-lg disabled:cursor-not-allowed disabled:opacity-50 sm:px-8"
+                >
+                  Suivant
+                  <ArrowRight size={18} className="ml-2" />
+                </button>
+              )}
+            </div>
+          </div>
         </div>
       </div>
     </div>

@@ -3,3 +3,4 @@ back-monviso/venv
 back-monviso/staticfiles
 back-monviso/media
 
+.env

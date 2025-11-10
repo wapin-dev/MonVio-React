@@ -48,6 +48,8 @@ const TransactionManagement = () => {
   const [maxAmount, setMaxAmount] = useState('');
   const [selectedPeriod, setSelectedPeriod] = useState('Ce mois');
   const [showNewTransactionModal, setShowNewTransactionModal] = useState(false);
+  const [showEditTransactionModal, setShowEditTransactionModal] = useState(false);
+  const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
   const [newTransaction, setNewTransaction] = useState({
     name: '',
     amount: '',
@@ -335,6 +337,123 @@ const TransactionManagement = () => {
     });
   };
 
+  const closeEditModal = () => {
+    setShowEditTransactionModal(false);
+    setEditingTransaction(null);
+  };
+
+  const handleEditTransaction = (transaction: Transaction) => {
+    setEditingTransaction(transaction);
+    setShowEditTransactionModal(true);
+  };
+
+  const handleDeleteTransaction = async (transactionId: string) => {
+    if (!confirm('Êtes-vous sûr de vouloir supprimer cette transaction ?')) {
+      return;
+    }
+
+    try {
+      // Extraire l'ID numérique de l'ID de transaction
+      const numericId = transactionId.replace(/^(real-|income-|expense-)/, '');
+      await transactionService.delete(parseInt(numericId));
+      
+      // Rafraîchir la liste des transactions
+      const fetchTransactions = async () => {
+        try {
+          const response = await transactionService.getAll();
+          const realTransactions = response.data.map((transaction: any) => ({
+            id: `real-${transaction.id}`,
+            name: transaction.name,
+            amount: Number(transaction.amount),
+            type: transaction.type,
+            frequency: transaction.frequency,
+            category: transaction.category || 'Non catégorisé',
+            date: transaction.date,
+            paymentMethod: transaction.payment_method || 'Non spécifié'
+          }));
+          
+          setTransactions(prev => {
+            const onboardingTransactions = prev.filter(t => 
+              t.id.startsWith('income-') || t.id.startsWith('expense-')
+            );
+            return [...onboardingTransactions, ...realTransactions];
+          });
+        } catch (error) {
+          console.error('Erreur lors de la récupération des transactions:', error);
+        }
+      };
+
+      await fetchTransactions();
+    } catch (error) {
+      console.error('Erreur lors de la suppression de la transaction:', error);
+      setError('Erreur lors de la suppression de la transaction');
+    }
+  };
+
+  const handleUpdateTransaction = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingTransaction) return;
+
+    try {
+      const paymentMethodMapping: { [key: string]: string } = {
+        'Virement principal': 'transfer',
+        'Virement': 'transfer',
+        'Carte Bancaire': 'card',
+        'Prélèvement': 'transfer',
+        'Espèces': 'cash',
+        'Chèque': 'check',
+        'Autre': 'other',
+        'Non spécifié': 'other'
+      };
+
+      const transactionData = {
+        name: editingTransaction.name,
+        amount: editingTransaction.type === 'expense' ? -Math.abs(editingTransaction.amount) : editingTransaction.amount,
+        type: editingTransaction.type,
+        category: editingTransaction.category,
+        date: editingTransaction.date,
+        payment_method: paymentMethodMapping[editingTransaction.paymentMethod] || 'other',
+        frequency: editingTransaction.frequency
+      };
+      
+      const numericId = editingTransaction.id.replace(/^(real-|income-|expense-)/, '');
+      await transactionService.update(parseInt(numericId), transactionData);
+      
+      closeEditModal();
+      
+      // Rafraîchir la liste des transactions
+      const fetchTransactions = async () => {
+        try {
+          const response = await transactionService.getAll();
+          const realTransactions = response.data.map((transaction: any) => ({
+            id: `real-${transaction.id}`,
+            name: transaction.name,
+            amount: Number(transaction.amount),
+            type: transaction.type,
+            frequency: transaction.frequency,
+            category: transaction.category || 'Non catégorisé',
+            date: transaction.date,
+            paymentMethod: transaction.payment_method || 'Non spécifié'
+          }));
+          
+          setTransactions(prev => {
+            const onboardingTransactions = prev.filter(t => 
+              t.id.startsWith('income-') || t.id.startsWith('expense-')
+            );
+            return [...onboardingTransactions, ...realTransactions];
+          });
+        } catch (error) {
+          console.error('Erreur lors de la récupération des transactions:', error);
+        }
+      };
+
+      await fetchTransactions();
+    } catch (error) {
+      console.error('Erreur lors de la mise à jour de la transaction:', error);
+      setError('Erreur lors de la mise à jour de la transaction');
+    }
+  };
+
   // Fonctions de navigation
   const goToPage = (page: number) => {
     if (page >= 1 && page <= totalPages) {
@@ -496,10 +615,18 @@ const TransactionManagement = () => {
                     {transaction.amount >= 0 ? `+${Number(transaction.amount).toFixed(2)} €` : `${Number(transaction.amount).toFixed(2)} €`}
                   </td>
                   <td className="whitespace-nowrap px-6 py-4 text-right text-sm">
-                    <button className="text-blue-400 hover:text-blue-300 mr-3 transition-colors">
+                    <button 
+                      onClick={() => handleEditTransaction(transaction)}
+                      className="text-blue-400 hover:text-blue-300 mr-3 transition-colors"
+                      title="Modifier la transaction"
+                    >
                       <EditIcon size={16} />
                     </button>
-                    <button className="text-red-400 hover:text-red-300 transition-colors">
+                    <button 
+                      onClick={() => handleDeleteTransaction(transaction.id)}
+                      className="text-red-400 hover:text-red-300 transition-colors"
+                      title="Supprimer la transaction"
+                    >
                       <TrashIcon size={16} />
                     </button>
                   </td>
@@ -630,6 +757,131 @@ const TransactionManagement = () => {
           </div>
         </div>
       </div>}
+      
+      {/* Modal d'édition de transaction */}
+      {showEditTransactionModal && editingTransaction && (
+        <div className="fixed inset-0 z-10 overflow-y-auto" aria-labelledby="edit-modal-headline" role="dialog" aria-modal="true">
+          <div className="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+            <div className="fixed inset-0 transition-opacity" aria-hidden="true">
+              <div className="absolute inset-0 bg-gray-500 opacity-75"></div>
+            </div>
+            <div className="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full" role="dialog" aria-modal="true" aria-labelledby="edit-modal-headline">
+              <form onSubmit={handleUpdateTransaction} className="space-y-6">
+                <div className="bg-gray-800/50 px-4 py-3 flex items-center justify-between border-b border-gray-700/30">
+                  <h2 className="text-lg font-bold text-gray-100" id="edit-modal-headline">
+                    Modifier la transaction
+                  </h2>
+                  <button type="button" onClick={closeEditModal} className="text-gray-400 hover:text-gray-300 transition-colors">
+                    <XIcon size={16} />
+                  </button>
+                </div>
+                <div className="p-6">
+                  <div>
+                    <label htmlFor="edit-name" className="block text-sm font-medium text-gray-300">
+                      Nom de la transaction
+                    </label>
+                    <input 
+                      type="text" 
+                      id="edit-name" 
+                      value={editingTransaction.name} 
+                      onChange={(e) => setEditingTransaction({...editingTransaction, name: e.target.value})} 
+                      className="mt-1 block w-full rounded-xl border-0 bg-gray-800/50 backdrop-blur-md py-2 px-3 text-gray-100 focus:ring-2 focus:ring-blue-500/50 shadow-md shadow-black/10" 
+                    />
+                  </div>
+                  <div>
+                    <label htmlFor="edit-amount" className="block text-sm font-medium text-gray-300">
+                      Montant
+                    </label>
+                    <input 
+                      type="number" 
+                      id="edit-amount" 
+                      value={Math.abs(editingTransaction.amount)} 
+                      onChange={(e) => setEditingTransaction({...editingTransaction, amount: parseFloat(e.target.value) || 0})} 
+                      className="mt-1 block w-full rounded-xl border-0 bg-gray-800/50 backdrop-blur-md py-2 px-3 text-gray-100 focus:ring-2 focus:ring-blue-500/50 shadow-md shadow-black/10" 
+                    />
+                  </div>
+                  <div>
+                    <label htmlFor="edit-type" className="block text-sm font-medium text-gray-300">
+                      Type
+                    </label>
+                    <select 
+                      id="edit-type" 
+                      value={editingTransaction.type} 
+                      onChange={(e) => setEditingTransaction({...editingTransaction, type: e.target.value})} 
+                      className="mt-1 block w-full rounded-xl border-0 bg-gray-800/50 backdrop-blur-md py-2 px-3 text-gray-100 focus:ring-2 focus:ring-blue-500/50 shadow-md shadow-black/10"
+                    >
+                      <option value="expense">Dépense</option>
+                      <option value="income">Revenu</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label htmlFor="edit-category" className="block text-sm font-medium text-gray-300">
+                      Catégorie
+                    </label>
+                    <select 
+                      id="edit-category" 
+                      value={editingTransaction.category} 
+                      onChange={(e) => setEditingTransaction({...editingTransaction, category: e.target.value})} 
+                      className="mt-1 block w-full rounded-xl border-0 bg-gray-800/50 backdrop-blur-md py-2 px-3 text-gray-100 focus:ring-2 focus:ring-blue-500/50 shadow-md shadow-black/10"
+                    >
+                      {categories.map(category => <option key={category}>{category}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label htmlFor="edit-date" className="block text-sm font-medium text-gray-300">
+                      Date
+                    </label>
+                    <input 
+                      type="date" 
+                      id="edit-date" 
+                      value={editingTransaction.date} 
+                      onChange={(e) => setEditingTransaction({...editingTransaction, date: e.target.value})} 
+                      className="mt-1 block w-full rounded-xl border-0 bg-gray-800/50 backdrop-blur-md py-2 px-3 text-gray-100 focus:ring-2 focus:ring-blue-500/50 shadow-md shadow-black/10" 
+                    />
+                  </div>
+                  <div>
+                    <label htmlFor="edit-paymentMethod" className="block text-sm font-medium text-gray-300">
+                      Moyen de paiement
+                    </label>
+                    <select 
+                      id="edit-paymentMethod" 
+                      value={editingTransaction.paymentMethod} 
+                      onChange={(e) => setEditingTransaction({...editingTransaction, paymentMethod: e.target.value})} 
+                      className="mt-1 block w-full rounded-xl border-0 bg-gray-800/50 backdrop-blur-md py-2 px-3 text-gray-100 focus:ring-2 focus:ring-blue-500/50 shadow-md shadow-black/10"
+                    >
+                      {paymentMethods.map(method => <option key={method}>{method}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label htmlFor="edit-frequency" className="block text-sm font-medium text-gray-300">
+                      Fréquence
+                    </label>
+                    <select 
+                      id="edit-frequency" 
+                      value={editingTransaction.frequency} 
+                      onChange={(e) => setEditingTransaction({...editingTransaction, frequency: e.target.value})} 
+                      className="mt-1 block w-full rounded-xl border-0 bg-gray-800/50 backdrop-blur-md py-2 px-3 text-gray-100 focus:ring-2 focus:ring-blue-500/50 shadow-md shadow-black/10"
+                    >
+                      <option value="unique">Unique</option>
+                      <option value="mensuel">Mensuel</option>
+                      <option value="trimestriel">Trimestriel</option>
+                      <option value="annuel">Annuel</option>
+                    </select>
+                  </div>
+                </div>
+                <div className="bg-gray-800/50 px-4 py-3 flex items-center justify-between border-t border-gray-700/30">
+                  <button type="button" onClick={closeEditModal} className="text-gray-400 hover:text-gray-300 transition-colors">
+                    Annuler
+                  </button>
+                  <button type="submit" className="inline-flex items-center rounded-xl bg-gradient-to-r from-green-600 to-emerald-600 px-4 py-2 text-sm font-medium text-white shadow-lg shadow-green-700/20 hover:from-green-700 hover:to-emerald-700 transition-all duration-200">
+                    Mettre à jour
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+      )}
     </div>;
 };
 export default TransactionManagement;

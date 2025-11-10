@@ -5,8 +5,8 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework.permissions import IsAuthenticated
-from .serializers import OnboardingDataSerializer, UserProfileSerializer, IncomeSerializer, ExpenseSerializer, SavingsGoalSerializer, TransactionSerializer
-from budget.models import UserProfile, Income, Expense, SavingsGoal, Transaction
+from .serializers import OnboardingDataSerializer, UserProfileSerializer, IncomeSerializer, ExpenseSerializer, SavingsGoalSerializer, TransactionSerializer, CategorySerializer
+from budget.models import UserProfile, Income, Expense, SavingsGoal, Transaction, Category
 
 # Create your views here.
 
@@ -255,14 +255,18 @@ class FinancialDataView(APIView):
                     'name': expense.name,
                     'amount': expense.amount,
                     'frequency': expense.frequency,
-                    'type': expense.type
+                    'type': expense.type,
+                    'category_id': expense.category.id if expense.category else None,
+                    'category_name': expense.category.name if expense.category else None
                 } for expense in fixed_expenses],
                 'variable_expenses': [{
                     'id': expense.id,
                     'name': expense.name,
                     'amount': expense.amount,
                     'frequency': expense.frequency,
-                    'type': expense.type
+                    'type': expense.type,
+                    'category_id': expense.category.id if expense.category else None,
+                    'category_name': expense.category.name if expense.category else None
                 } for expense in variable_expenses],
                 'savings_goals': [{
                     'id': goal.id,
@@ -276,7 +280,20 @@ class FinancialDataView(APIView):
             })
             
         except UserProfile.DoesNotExist:
-            return Response({'error': 'Profile not found'}, status=404)
+            # Retourner des données vides si l'utilisateur n'a pas encore complété l'onboarding
+            return Response({
+                'monthly_income': 0,
+                'total_income': 0,
+                'total_expenses': 0,
+                'total_fixed_expenses': 0,
+                'total_variable_expenses': 0,
+                'remaining_budget': 0,
+                'incomes': [],
+                'fixed_expenses': [],
+                'variable_expenses': [],
+                'savings_goals': [],
+                'needs_onboarding': True
+            })
 
 class TransactionListCreateView(APIView):
     """
@@ -342,3 +359,68 @@ class TransactionDetailView(APIView):
         
         transaction.delete()
         return Response({'message': 'Transaction supprimée avec succès'}, status=status.HTTP_204_NO_CONTENT)
+
+class CategoryListCreateView(APIView):
+    """
+    Endpoint pour lister et créer des catégories
+    """
+    permission_classes = [permissions.IsAuthenticated]
+    
+    def get(self, request):
+        """Récupérer toutes les catégories de l'utilisateur"""
+        categories = Category.objects.filter(user=request.user)
+        serializer = CategorySerializer(categories, many=True)
+        return Response(serializer.data)
+    
+    def post(self, request):
+        """Créer une nouvelle catégorie"""
+        print(f"[CATEGORY] Données reçues: {request.data}")
+        serializer = CategorySerializer(data=request.data)
+        if serializer.is_valid():
+            category = serializer.save(user=request.user)
+            print(f"[CATEGORY] Catégorie créée avec succès: {category}")
+            return Response(CategorySerializer(category).data, status=status.HTTP_201_CREATED)
+        print(f"[CATEGORY] Erreurs de validation: {serializer.errors}")
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+class CategoryDetailView(APIView):
+    """
+    Endpoint pour récupérer, modifier ou supprimer une catégorie spécifique
+    """
+    permission_classes = [permissions.IsAuthenticated]
+    
+    def get_object(self, pk, user):
+        try:
+            return Category.objects.get(pk=pk, user=user)
+        except Category.DoesNotExist:
+            return None
+    
+    def get(self, request, pk):
+        """Récupérer une catégorie spécifique"""
+        category = self.get_object(pk, request.user)
+        if not category:
+            return Response({'error': 'Catégorie non trouvée'}, status=status.HTTP_404_NOT_FOUND)
+        
+        serializer = CategorySerializer(category)
+        return Response(serializer.data)
+    
+    def put(self, request, pk):
+        """Modifier une catégorie"""
+        category = self.get_object(pk, request.user)
+        if not category:
+            return Response({'error': 'Catégorie non trouvée'}, status=status.HTTP_404_NOT_FOUND)
+        
+        serializer = CategorySerializer(category, data=request.data, partial=True)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    
+    def delete(self, request, pk):
+        """Supprimer une catégorie"""
+        category = self.get_object(pk, request.user)
+        if not category:
+            return Response({'error': 'Catégorie non trouvée'}, status=status.HTTP_404_NOT_FOUND)
+        
+        category.delete()
+        return Response({'message': 'Catégorie supprimée avec succès'}, status=status.HTTP_204_NO_CONTENT)

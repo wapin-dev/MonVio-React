@@ -25,9 +25,30 @@ class SavingsGoalSerializer(serializers.ModelSerializer):
         fields = ['id', 'name', 'target_amount', 'current_amount', 'target_date', 'type', 'priority', 'progress_percentage']
 
 class CategorySerializer(serializers.ModelSerializer):
+    monthly_budget = serializers.DecimalField(max_digits=10, decimal_places=2, required=False, allow_null=True)
+    color = serializers.CharField(max_length=9, required=False)
+    icon = serializers.CharField(max_length=16, required=False)
+
     class Meta:
         model = Category
-        fields = ['id', 'name', 'type']
+        fields = ['id', 'name', 'type', 'monthly_budget', 'color', 'icon', 'created_at', 'updated_at']
+        read_only_fields = ['id', 'created_at', 'updated_at']
+
+    def validate_color(self, value):
+        if value and not value.startswith('#'):
+            raise serializers.ValidationError('Le code couleur doit commencer par #.')
+        return value.upper() if value else value
+
+    def validate(self, attrs):
+        data = super().validate(attrs)
+        category_type = data.get('type') or getattr(self.instance, 'type', None)
+        if category_type == 'income' and data.get('monthly_budget') is not None:
+            # Allow budget for income? We'll accept but ensure positive? We'll just ensure >=0
+            pass
+        monthly_budget = data.get('monthly_budget')
+        if monthly_budget is not None and monthly_budget < 0:
+            raise serializers.ValidationError({'monthly_budget': 'Le budget doit être positif.'})
+        return data
 
 class TransactionSerializer(serializers.ModelSerializer):
     class Meta:

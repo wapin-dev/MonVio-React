@@ -23,7 +23,11 @@ class Category(models.Model):
     name = models.CharField(max_length=100)
     type = models.CharField(max_length=10, choices=CATEGORY_TYPES)
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='categories')
+    monthly_budget = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    color = models.CharField(max_length=9, default='#6366F1')
+    icon = models.CharField(max_length=16, default='💰')
     created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
         verbose_name_plural = "Categories"
