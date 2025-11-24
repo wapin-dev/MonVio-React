@@ -217,17 +217,29 @@ class FinancialDataView(APIView):
         try:
             profile = UserProfile.objects.get(user=user)
             
-            # Récupérer les revenus
+            # Récupérer les revenus d'onboarding
             incomes = Income.objects.filter(user=user)
-            total_income = sum(income.amount for income in incomes)
+            total_income_onboarding = sum(income.amount for income in incomes)
             
-            # Récupérer les dépenses fixes
+            # Récupérer les dépenses fixes d'onboarding
             fixed_expenses = Expense.objects.filter(user=user, type='fixed')
-            total_fixed_expenses = sum(expense.amount for expense in fixed_expenses)
+            total_fixed_expenses_onboarding = sum(expense.amount for expense in fixed_expenses)
             
-            # Récupérer les dépenses variables
+            # Récupérer les dépenses variables d'onboarding
             variable_expenses = Expense.objects.filter(user=user, type='variable')
-            total_variable_expenses = sum(expense.amount for expense in variable_expenses)
+            total_variable_expenses_onboarding = sum(expense.amount for expense in variable_expenses)
+            
+            # Récupérer les transactions
+            transactions = Transaction.objects.filter(user=user)
+            
+            # Calculer les revenus et dépenses des transactions
+            transactions_income = sum(abs(t.amount) for t in transactions if t.type == 'income')
+            transactions_expenses = sum(abs(t.amount) for t in transactions if t.type == 'expense')
+            
+            # Calculer les totaux en incluant les transactions
+            total_income = total_income_onboarding + transactions_income
+            total_fixed_expenses = total_fixed_expenses_onboarding
+            total_variable_expenses = total_variable_expenses_onboarding + transactions_expenses
             
             total_expenses = total_fixed_expenses + total_variable_expenses
             remaining_budget = total_income - total_expenses
@@ -268,6 +280,16 @@ class FinancialDataView(APIView):
                     'category_id': expense.category.id if expense.category else None,
                     'category_name': expense.category.name if expense.category else None
                 } for expense in variable_expenses],
+                'transactions': [{
+                    'id': transaction.id,
+                    'name': transaction.name,
+                    'amount': abs(transaction.amount),
+                    'type': transaction.type,
+                    'category': transaction.category,
+                    'date': transaction.date,
+                    'payment_method': transaction.payment_method,
+                    'frequency': transaction.frequency
+                } for transaction in transactions],
                 'savings_goals': [{
                     'id': goal.id,
                     'name': goal.name,
@@ -291,6 +313,7 @@ class FinancialDataView(APIView):
                 'incomes': [],
                 'fixed_expenses': [],
                 'variable_expenses': [],
+                'transactions': [],
                 'savings_goals': [],
                 'needs_onboarding': True
             })

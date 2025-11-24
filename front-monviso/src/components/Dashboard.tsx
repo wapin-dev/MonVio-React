@@ -15,7 +15,19 @@ interface FinancialData {
   incomes: Income[];
   fixed_expenses: Expense[];
   variable_expenses: Expense[];
+  transactions: Transaction[];
   savings_goals: SavingsGoal[];
+}
+
+interface Transaction {
+  id: number;
+  name: string;
+  amount: number;
+  type: string;
+  category: string;
+  date: string;
+  payment_method: string;
+  frequency: string;
 }
 
 interface Income {
@@ -93,6 +105,9 @@ const Dashboard = () => {
         '#c084fc', // purple-400
       ];
 
+      // Ajouter les transactions de type 'expense' au pie chart
+      const transactionExpenses = response.data.transactions?.filter((t: Transaction) => t.type === 'expense') || [];
+      
       const pieData = [
         ...response.data.fixed_expenses.map((expense: Expense, i: number) => ({
           name: expense.name,
@@ -103,6 +118,11 @@ const Dashboard = () => {
           name: expense.name,
           value: expense.amount,
           color: variableColors[i % variableColors.length],
+        })),
+        ...transactionExpenses.map((transaction: Transaction, i: number) => ({
+          name: transaction.name,
+          value: transaction.amount,
+          color: variableColors[(response.data.variable_expenses.length + i) % variableColors.length],
         })),
       ];
       setPieData(pieData);

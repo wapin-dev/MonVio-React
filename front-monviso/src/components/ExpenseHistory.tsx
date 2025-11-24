@@ -63,8 +63,10 @@ const ExpenseHistory: React.FC = () => {
     const loadTransactions = async () => {
       try {
         setIsLoading(true);
-        const response = await transactionService.getAll();
-        const normalized: TransactionItem[] = (response.data || []).map((item: any) => ({
+        
+        // Charger les transactions manuelles
+        const transactionsResponse = await transactionService.getAll();
+        const manualTransactions: TransactionItem[] = (transactionsResponse.data || []).map((item: any) => ({
           id: item.id,
           name: item.name,
           amount: toNumber(item.amount),
@@ -73,24 +75,73 @@ const ExpenseHistory: React.FC = () => {
           category: item.category || 'Autres',
           frequency: item.frequency || 'unique'
         }));
-        setTransactions(normalized);
+        
+        // Charger les données d'onboarding depuis financialData
+        const onboardingTransactions: TransactionItem[] = [];
+        const currentDate = new Date().toISOString().split('T')[0];
+        
+        if (financialData) {
+          // Ajouter les revenus d'onboarding
+          financialData.incomes?.forEach((income: any) => {
+            onboardingTransactions.push({
+              id: income.id,
+              name: income.name,
+              amount: toNumber(income.amount),
+              type: 'income',
+              date: currentDate,
+              category: 'Revenus',
+              frequency: income.frequency || 'mensuel'
+            });
+          });
+          
+          // Ajouter les dépenses fixes d'onboarding
+          financialData.fixed_expenses?.forEach((expense: any) => {
+            onboardingTransactions.push({
+              id: expense.id,
+              name: expense.name,
+              amount: toNumber(expense.amount),
+              type: 'expense',
+              date: currentDate,
+              category: expense.category_name || 'Dépenses fixes',
+              frequency: expense.frequency || 'mensuel'
+            });
+          });
+          
+          // Ajouter les dépenses variables d'onboarding
+          financialData.variable_expenses?.forEach((expense: any) => {
+            onboardingTransactions.push({
+              id: expense.id,
+              name: expense.name,
+              amount: toNumber(expense.amount),
+              type: 'expense',
+              date: currentDate,
+              category: expense.category_name || 'Dépenses variables',
+              frequency: expense.frequency || 'mensuel'
+            });
+          });
+        }
+        
+        // Combiner toutes les transactions
+        const allTransactions = [...onboardingTransactions, ...manualTransactions];
+        setTransactions(allTransactions);
         setError(null);
-        if (normalized.length > 0) {
+        
+        if (allTransactions.length > 0) {
           const newestYear = Math.max(
-            ...normalized.map((transaction) => new Date(transaction.date).getFullYear())
+            ...allTransactions.map((transaction) => new Date(transaction.date).getFullYear())
           );
           setSelectedYear((prev) => prev ?? newestYear);
         }
       } catch (err) {
-        console.error('Erreur de récupération de l’historique:', err);
-        setError('Impossible de charger votre historique de dépenses pour le moment.');
+        console.error("Erreur de récupération de l'historique:", err);
+        setError("Impossible de charger votre historique de dépenses pour le moment.");
       } finally {
         setIsLoading(false);
       }
     };
 
     loadTransactions();
-  }, []);
+  }, [financialData]);
 
   const availableYears = useMemo(() => {
     const years = new Set<number>();
