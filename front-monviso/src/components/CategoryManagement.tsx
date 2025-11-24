@@ -7,7 +7,7 @@ import {
   Palette,
   Wallet
 } from 'lucide-react';
-import { categoryService } from '../services/api';
+import { categoryService, transactionService } from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
 import type { AxiosError } from 'axios';
 
@@ -73,17 +73,27 @@ const CategoryManagement: React.FC = () => {
   const [editingId, setEditingId] = useState<number | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [filter, setFilter] = useState<'all' | 'income' | 'expense'>('all');
+  const [transactions, setTransactions] = useState<any[]>([]);
+
+  const loadTransactions = async () => {
+    try {
+      const response = await transactionService.getAll();
+      setTransactions(response.data || []);
+    } catch (err) {
+      console.error('Erreur de récupération des transactions:', err);
+    }
+  };
 
   const loadCategories = async () => {
     try {
       setIsLoading(true);
       const response = await categoryService.getAll();
       const apiCategories: ApiCategory[] = response.data || [];
-      const spentByCategory = buildSpentMap(financialData);
+      const spentByCategory = buildSpentMap(financialData, transactions);
 
       const enriched = apiCategories.map<CategoryWithStats>((cat) => {
         const monthlyBudget = cat.monthly_budget != null ? toNumber(cat.monthly_budget) : null;
-        const spent = cat.type === 'expense' ? spentByCategory.get(cat.id) || 0 : 0;
+        const spent = cat.type === 'expense' ? spentByCategory.get(cat.name) || 0 : 0;
         const delta = monthlyBudget != null ? monthlyBudget - spent : null;
         const usage = monthlyBudget && monthlyBudget > 0 ? Math.min(100, (spent / monthlyBudget) * 100) : null;
         const color = cat.color || '#6366F1';
@@ -114,26 +124,21 @@ const CategoryManagement: React.FC = () => {
   useEffect(() => {
     const init = async () => {
       await refreshFinancialData();
-      await loadCategories();
+      await loadTransactions();
     };
     init();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
-    if (!isLoading) {
-      // Recalculer les dépenses quand les données financières changent
-      const spentByCategory = buildSpentMap(financialData);
-      setCategories((prev) =>
-        prev.map((cat) => {
-          const spent = cat.type === 'expense' ? spentByCategory.get(cat.id) || 0 : 0;
-          const delta = cat.monthlyBudget != null ? cat.monthlyBudget - spent : null;
-          const usage = cat.monthlyBudget && cat.monthlyBudget > 0 ? Math.min(100, (spent / cat.monthlyBudget) * 100) : null;
-          return { ...cat, spent, delta, usage };
-        })
-      );
+    if (financialData && transactions.length >= 0) {
+      loadCategories();
     }
-  }, [financialData, isLoading]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [financialData, transactions]);
+
+  // Ce useEffect n'est plus nécessaire car le calcul se fait déjà dans loadCategories
+  // qui est appelé quand financialData ou transactions changent
 
   const handleResetForm = () => {
     setForm(DEFAULT_FORM);
@@ -156,7 +161,7 @@ const CategoryManagement: React.FC = () => {
     try {
       await categoryService.delete(id);
       await refreshFinancialData();
-      await loadCategories();
+      await loadTransactions();
       if (editingId === id) {
         handleResetForm();
       }
@@ -189,11 +194,11 @@ const CategoryManagement: React.FC = () => {
         await categoryService.create(payload);
       }
       await refreshFinancialData();
-      await loadCategories();
+      await loadTransactions();
       handleResetForm();
     } catch (err) {
       console.error('Erreur lors de la sauvegarde de la catégorie:', err);
-      setError(extractErrorMessage(err) || 'Impossible d’enregistrer la catégorie. Vérifiez les données saisies.');
+      setError(extractErrorMessage(err) || "Impossible d'enregistrer la catégorie. Vérifiez les données saisies.");
     } finally {
       setIsSubmitting(false);
     }
@@ -527,20 +532,40 @@ const CategoryManagement: React.FC = () => {
   );
 };
 
-function buildSpentMap(financialData: ReturnType<typeof useAuth>['financialData']): Map<number, number> {
-  const map = new Map<number, number>();
+function buildSpentMap(
+  financialData: ReturnType<typeof useAuth>['financialData'],
+  transactions: any[]
+): Map<string, number> {
+  const map = new Map<string, number>();
   if (!financialData) return map;
 
-  const register = (expense?: { category_id?: number | null; category?: number | null; amount?: number | string | null }) => {
+  // Fonction pour enregistrer une dépense par nom de catégorie
+  const registerByName = (categoryName: string | null | undefined, amount: number | string | null | undefined) => {
+    if (!categoryName) return;
+    const amountNum = toNumber(amount);
+    if (amountNum === 0) return;
+    map.set(categoryName, (map.get(categoryName) || 0) + Math.abs(amountNum));
+  };
+
+  // Ancien système : enregistrer les dépenses fixes et variables
+  const register = (expense?: { category_id?: number | null; category?: number | null; category_name?: string | null; amount?: number | string | null }) => {
     if (!expense) return;
-    const categoryId = expense.category_id ?? (expense.category as number | undefined);
-    if (!categoryId) return;
-    const amount = toNumber(expense.amount);
-    map.set(categoryId, (map.get(categoryId) || 0) + amount);
+    // Si on a un nom de catégorie, l'utiliser directement
+    if (expense.category_name) {
+      registerByName(expense.category_name, expense.amount);
+    }
   };
 
   (financialData.fixed_expenses || []).forEach(register);
   (financialData.variable_expenses || []).forEach(register);
+
+  // Nouveau système : inclure les transactions de type "expense"
+  transactions.forEach((transaction: any) => {
+    if (transaction.type === 'expense' && transaction.category) {
+      // Les montants des dépenses sont déjà négatifs dans les transactions
+      registerByName(transaction.category, transaction.amount);
+    }
+  });
 
   return map;
 }

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { PlusIcon, FilterIcon, SearchIcon, ChevronDownIcon, ChevronUpIcon, TrashIcon, EditIcon, XIcon } from 'lucide-react';
-import { onboardingService, transactionService } from '../services/api';
+import { onboardingService, transactionService, categoryService } from '../services/api';
 import { useSearchParams } from 'react-router-dom';
 
 interface Income {
@@ -29,6 +29,14 @@ interface Transaction {
   category: string;
   date: string;
   paymentMethod: string;
+}
+
+interface Category {
+  id: number;
+  name: string;
+  type: 'income' | 'expense';
+  icon?: string;
+  color?: string;
 }
 
 const TransactionManagement = () => {
@@ -62,6 +70,38 @@ const TransactionManagement = () => {
   });
 
   const [searchParams, setSearchParams] = useSearchParams();
+  
+  // État pour les catégories personnalisées
+  const [customCategories, setCustomCategories] = useState<Category[]>([]);
+  
+  // Catégories par défaut organisées par type
+  const defaultCategoriesByType = {
+    income: ['Revenus'],
+    expense: ['Dépenses fixes', 'Dépenses variables', 'Épargne', 'Non catégorisé']
+  };
+  
+  const allDefaultCategories = [...defaultCategoriesByType.income, ...defaultCategoriesByType.expense];
+
+  // Récupérer les catégories personnalisées
+  useEffect(() => {
+    const fetchCategories = async () => {
+      try {
+        const response = await categoryService.getAll();
+        const categories: Category[] = response.data.map((cat: any) => ({
+          id: cat.id,
+          name: cat.name,
+          type: cat.type,
+          icon: cat.icon,
+          color: cat.color
+        }));
+        setCustomCategories(categories);
+      } catch (error) {
+        console.error('Erreur lors de la récupération des catégories:', error);
+      }
+    };
+    
+    fetchCategories();
+  }, []);
 
   // Récupérer les données financières au chargement du composant
   useEffect(() => {
@@ -171,7 +211,19 @@ const TransactionManagement = () => {
     }
   }, [searchParams, setSearchParams, showNewTransactionModal]);
 
-  const categories = ['Toutes les catégories', ...Array.from(new Set(transactions.map(t => t.category)))];
+  // Fonction pour obtenir les catégories filtrées par type de transaction
+  const getCategoriesForType = (type: 'income' | 'expense') => {
+    const defaultCats = defaultCategoriesByType[type] || [];
+    const customCats = customCategories.filter(cat => cat.type === type);
+    return { defaultCats, customCats };
+  };
+  
+  // Pour le filtre de recherche, inclure toutes les catégories
+  const customCategoryNames = customCategories.map(cat => cat.name);
+  const allCategoryNames = [...allDefaultCategories, ...customCategoryNames];
+  const transactionCategories = Array.from(new Set(transactions.map(t => t.category)));
+  const categoriesForFilter = ['Toutes les catégories', ...Array.from(new Set([...allCategoryNames, ...transactionCategories]))];
+  
   const paymentMethods = ['Tous les moyens', ...Array.from(new Set(transactions.map(t => t.paymentMethod)))];
   
   // Fonction de filtrage des transactions
@@ -253,14 +305,47 @@ const TransactionManagement = () => {
 
   // Fonctions pour gérer le modal de nouvelle transaction
   const handleNewTransactionChange = (field: string, value: string) => {
-    setNewTransaction(prev => ({
-      ...prev,
-      [field]: value
-    }));
+    setNewTransaction(prev => {
+      const updated = { ...prev, [field]: value };
+      
+      // Si on change le type, réinitialiser la catégorie pour éviter les incohérences
+      if (field === 'type') {
+        updated.category = '';
+      }
+      
+      return updated;
+    });
+    
+    // Réinitialiser l'erreur quand l'utilisateur modifie le formulaire
+    if (error) {
+      setError(null);
+    }
   };
 
   const handleSubmitNewTransaction = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Validation des champs requis
+    if (!newTransaction.name.trim()) {
+      setError('Le nom de la transaction est requis');
+      return;
+    }
+    
+    if (!newTransaction.amount || parseFloat(newTransaction.amount) <= 0) {
+      setError('Le montant doit être supérieur à 0');
+      return;
+    }
+    
+    if (!newTransaction.category) {
+      setError('Veuillez sélectionner une catégorie');
+      return;
+    }
+    
+    if (!newTransaction.paymentMethod) {
+      setError('Veuillez sélectionner un moyen de paiement');
+      return;
+    }
+    
     try {
       // Mapper les moyens de paiement vers les codes backend
       const paymentMethodMapping: { [key: string]: string } = {
@@ -348,6 +433,7 @@ const TransactionManagement = () => {
       paymentMethod: '',
       frequency: 'unique'
     });
+    setError(null); // Réinitialiser l'erreur lors de la fermeture
   };
 
   const closeEditModal = () => {
@@ -519,7 +605,8 @@ const TransactionManagement = () => {
     );
   }
   return (
-    <div className="space-y-6 pb-24 sm:pb-6">
+    <React.Fragment>
+      <div className="space-y-6 pb-24 sm:pb-6">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-blue-300 to-purple-300">
           Gestion des transactions
@@ -560,7 +647,7 @@ const TransactionManagement = () => {
                 Catégorie
               </label>
               <select id="category-filter" value={selectedCategory} onChange={(e) => handleCategoryChange(e.target.value)} className="mt-1 block w-full rounded-xl border-0 bg-gray-800/50 backdrop-blur-md py-2 px-3 text-gray-100 focus:ring-2 focus:ring-blue-500/50 shadow-md shadow-black/10">
-                {categories.map(category => <option key={category}>{category}</option>)}
+                {categoriesForFilter.map(category => <option key={category}>{category}</option>)}
               </select>
             </div>
             <div>
@@ -585,8 +672,54 @@ const TransactionManagement = () => {
             </div>
           </div>}
       </div>
-      {/* Transactions table */}
-      <div className="overflow-hidden rounded-xl bg-gradient-to-br from-gray-800/70 to-gray-900/70 backdrop-blur-md border border-gray-700/50 shadow-xl">
+      {/* Transactions - Mobile Cards */}
+      <div className="block md:hidden space-y-3">
+        {currentTransactions.map(transaction => (
+          <div
+            key={transaction.id}
+            className="rounded-xl bg-gradient-to-br from-gray-800/70 to-gray-900/70 backdrop-blur-md border border-gray-700/50 p-4 shadow-lg"
+          >
+            <div className="flex items-start justify-between mb-3">
+              <div className="flex-1">
+                <h3 className="text-base font-semibold text-white mb-1">{transaction.name}</h3>
+                <p className="text-xs text-gray-400">{new Date(transaction.date).toLocaleDateString('fr-FR')}</p>
+              </div>
+              <div className={`text-right ${transaction.amount >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                <p className="text-lg font-bold">
+                  {transaction.amount >= 0 ? `+${Number(transaction.amount).toFixed(2)} €` : `${Number(transaction.amount).toFixed(2)} €`}
+                </p>
+              </div>
+            </div>
+            <div className="flex flex-wrap items-center gap-2 mb-3">
+              <span className="inline-flex items-center rounded-full bg-blue-500/20 px-2.5 py-1 text-xs text-blue-200">
+                {transaction.category}
+              </span>
+              <span className="inline-flex items-center rounded-full bg-gray-700/50 px-2.5 py-1 text-xs text-gray-300">
+                {transaction.paymentMethod}
+              </span>
+            </div>
+            <div className="flex items-center justify-end gap-3 pt-2 border-t border-gray-700/30">
+              <button
+                onClick={() => handleEditTransaction(transaction)}
+                className="flex items-center gap-1.5 rounded-lg bg-blue-500/20 px-3 py-1.5 text-sm text-blue-300 hover:bg-blue-500/30 transition-colors"
+              >
+                <EditIcon size={14} />
+                Modifier
+              </button>
+              <button
+                onClick={() => handleDeleteTransaction(transaction.id)}
+                className="flex items-center gap-1.5 rounded-lg bg-red-500/20 px-3 py-1.5 text-sm text-red-300 hover:bg-red-500/30 transition-colors"
+              >
+                <TrashIcon size={14} />
+                Supprimer
+              </button>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Transactions - Desktop Table */}
+      <div className="hidden md:block overflow-hidden rounded-xl bg-gradient-to-br from-gray-800/70 to-gray-900/70 backdrop-blur-md border border-gray-700/50 shadow-xl">
         <div className="max-w-full">
           <table className="w-full table-auto divide-y divide-gray-700/30">
             <thead className="bg-gray-800/50">
@@ -650,16 +783,19 @@ const TransactionManagement = () => {
             </tbody>
           </table>
         </div>
-        <div className="bg-gray-800/50 px-4 py-3 flex items-center justify-between border-t border-gray-700/30">
-          <div className="flex-1 flex justify-between sm:hidden">
-            <button onClick={goToPreviousPage} className="relative inline-flex items-center px-4 py-2 border border-gray-700/50 text-sm font-medium rounded-xl text-gray-300 bg-gray-800/50 hover:bg-gray-700/50 transition-colors">
-              Précédent
-            </button>
-            <button onClick={goToNextPage} className="ml-3 relative inline-flex items-center px-4 py-2 border border-gray-700/50 text-sm font-medium rounded-xl text-gray-300 bg-gray-800/50 hover:bg-gray-700/50 transition-colors">
-              Suivant
-            </button>
-          </div>
-          <div className="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
+      </div>
+
+      {/* Pagination */}
+      <div className="rounded-xl bg-gradient-to-br from-gray-800/70 to-gray-900/70 backdrop-blur-md border border-gray-700/50 px-4 py-3 flex items-center justify-between">
+        <div className="flex-1 flex justify-between md:hidden">
+          <button onClick={goToPreviousPage} disabled={currentPage === 1} className="relative inline-flex items-center px-4 py-2 border border-gray-700/50 text-sm font-medium rounded-xl text-gray-300 bg-gray-800/50 hover:bg-gray-700/50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+            Précédent
+          </button>
+          <button onClick={goToNextPage} disabled={currentPage === totalPages} className="ml-3 relative inline-flex items-center px-4 py-2 border border-gray-700/50 text-sm font-medium rounded-xl text-gray-300 bg-gray-800/50 hover:bg-gray-700/50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+            Suivant
+          </button>
+        </div>
+        <div className="hidden md:flex md:flex-1 md:items-center md:justify-between">
             <div>
               <p className="text-sm text-gray-300">
                 Affichage de{' '}
@@ -689,15 +825,7 @@ const TransactionManagement = () => {
           </div>
         </div>
       </div>
-      <div className="-mt-14 flex justify-end px-6">
-        <button
-          className="hidden sm:inline-flex items-center rounded-xl bg-gradient-to-r from-blue-600 to-purple-600 px-4 py-2 text-sm font-medium text-white shadow-lg shadow-blue-700/20 hover:from-blue-700 hover:to-purple-700 transition-all duration-200"
-          onClick={() =>setShowNewTransactionModal(true)}
-        >
-          <PlusIcon size={16} className="mr-2" />
-          Ajouter une transaction
-        </button>
-      </div>
+
       {/* Modal de nouvelle transaction */}
       {showNewTransactionModal && (
         <div className="fixed inset-0 z-50 flex flex-col justify-end sm:justify-center">
@@ -732,6 +860,12 @@ const TransactionManagement = () => {
               </div>
 
               <div className="flex-1 space-y-6 overflow-y-auto px-6 pb-6">
+                {error && (
+                  <div className="rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-100">
+                    {error}
+                  </div>
+                )}
+                
                 <div>
                   <label htmlFor="name" className="block text-sm font-medium text-gray-300">
                     Nom de la transaction
@@ -742,6 +876,7 @@ const TransactionManagement = () => {
                     value={newTransaction.name}
                     onChange={(e) => handleNewTransactionChange('name', e.target.value)}
                     className="mt-1 block w-full rounded-xl border-0 bg-gray-800/60 py-2 px-3 text-gray-100 shadow-inner shadow-black/20 focus:ring-2 focus:ring-blue-500/50"
+                    required
                   />
                 </div>
 
@@ -753,9 +888,12 @@ const TransactionManagement = () => {
                     <input
                       type="number"
                       id="amount"
+                      step="0.01"
+                      min="0.01"
                       value={newTransaction.amount}
                       onChange={(e) => handleNewTransactionChange('amount', e.target.value)}
                       className="mt-1 block w-full rounded-xl border-0 bg-gray-800/60 py-2 px-3 text-gray-100 shadow-inner shadow-black/20 focus:ring-2 focus:ring-blue-500/50"
+                      required
                     />
                   </div>
                   <div>
@@ -783,10 +921,32 @@ const TransactionManagement = () => {
                     value={newTransaction.category}
                     onChange={(e) => handleNewTransactionChange('category', e.target.value)}
                     className="mt-1 block w-full rounded-xl border-0 bg-gray-800/60 py-2 px-3 text-gray-100 shadow-inner shadow-black/20 focus:ring-2 focus:ring-blue-500/50"
+                    required
                   >
-                    {categories.map((category) => (
-                      <option key={category}>{category}</option>
-                    ))}
+                    <option value="">-- Sélectionnez une catégorie --</option>
+                    {(() => {
+                      const { defaultCats, customCats } = getCategoriesForType(newTransaction.type as 'income' | 'expense');
+                      return (
+                        <>
+                          {defaultCats.length > 0 && (
+                            <optgroup label="Catégories par défaut">
+                              {defaultCats.map((category) => (
+                                <option key={`default-${category}`} value={category}>{category}</option>
+                              ))}
+                            </optgroup>
+                          )}
+                          {customCats.length > 0 && (
+                            <optgroup label="Mes catégories personnalisées">
+                              {customCats.map((category) => (
+                                <option key={`custom-${category.id}`} value={category.name}>
+                                  {category.icon ? `${category.icon} ` : ''}{category.name}
+                                </option>
+                              ))}
+                            </optgroup>
+                          )}
+                        </>
+                      );
+                    })()}
                   </select>
                 </div>
 
@@ -812,9 +972,11 @@ const TransactionManagement = () => {
                       value={newTransaction.paymentMethod}
                       onChange={(e) => handleNewTransactionChange('paymentMethod', e.target.value)}
                       className="mt-1 block w-full rounded-xl border-0 bg-gray-800/60 py-2 px-3 text-gray-100 shadow-inner shadow-black/20 focus:ring-2 focus:ring-blue-500/50"
+                      required
                     >
-                      {paymentMethods.map((method) => (
-                        <option key={method}>{method}</option>
+                      <option value="">-- Sélectionnez un moyen de paiement --</option>
+                      {paymentMethods.filter(m => m !== 'Tous les moyens').map((method) => (
+                        <option key={method} value={method}>{method}</option>
                       ))}
                     </select>
                   </div>
@@ -907,7 +1069,7 @@ const TransactionManagement = () => {
                     <select 
                       id="edit-type" 
                       value={editingTransaction.type} 
-                      onChange={(e) => setEditingTransaction({...editingTransaction, type: e.target.value})} 
+                      onChange={(e) => setEditingTransaction({...editingTransaction, type: e.target.value, category: ''})} 
                       className="mt-1 block w-full rounded-xl border-0 bg-gray-800/50 backdrop-blur-md py-2 px-3 text-gray-100 focus:ring-2 focus:ring-blue-500/50 shadow-md shadow-black/10"
                     >
                       <option value="expense">Dépense</option>
@@ -924,7 +1086,30 @@ const TransactionManagement = () => {
                       onChange={(e) => setEditingTransaction({...editingTransaction, category: e.target.value})} 
                       className="mt-1 block w-full rounded-xl border-0 bg-gray-800/50 backdrop-blur-md py-2 px-3 text-gray-100 focus:ring-2 focus:ring-blue-500/50 shadow-md shadow-black/10"
                     >
-                      {categories.map(category => <option key={category}>{category}</option>)}
+                      <option value="">-- Sélectionnez une catégorie --</option>
+                      {(() => {
+                        const { defaultCats, customCats } = getCategoriesForType(editingTransaction.type as 'income' | 'expense');
+                        return (
+                          <>
+                            {defaultCats.length > 0 && (
+                              <optgroup label="Catégories par défaut">
+                                {defaultCats.map((category) => (
+                                  <option key={`default-${category}`} value={category}>{category}</option>
+                                ))}
+                              </optgroup>
+                            )}
+                            {customCats.length > 0 && (
+                              <optgroup label="Mes catégories personnalisées">
+                                {customCats.map((category) => (
+                                  <option key={`custom-${category.id}`} value={category.name}>
+                                    {category.icon ? `${category.icon} ` : ''}{category.name}
+                                  </option>
+                                ))}
+                              </optgroup>
+                            )}
+                          </>
+                        );
+                      })()}
                     </select>
                   </div>
                   <div>
@@ -982,7 +1167,7 @@ const TransactionManagement = () => {
           </div>
         </div>
       )}
-    </div>
+    </React.Fragment>
   );
 };
 export default TransactionManagement;
